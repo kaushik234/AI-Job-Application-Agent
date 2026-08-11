@@ -1,0 +1,285 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?
+  firstName    String
+  lastName     String
+  role         String    @default("APPLICANT")
+  skills       String[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  resumes         Resume[]
+  applications    Application[]
+  applicationLogs ApplicationLog[]
+  emailLogs       EmailLog[]
+  notifications   Notification[]
+  setting         Setting?
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Country {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  name      String
+  isTarget  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  jobs Job[]
+
+  @@index([code])
+  @@map("countries")
+}
+
+model Company {
+  id          String    @id @default(uuid())
+  name        String
+  domain      String?   @unique
+  websiteUrl  String?
+  atsPlatform String?
+  logoUrl     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  jobs Job[]
+
+  @@index([name])
+  @@index([atsPlatform])
+  @@map("companies")
+}
+
+model Job {
+  id           String    @id @default(uuid())
+  companyId    String?
+  countryId    String?
+  title        String
+  location     String
+  url          String
+  platform     String
+  description  String?
+  requirements String[]
+  salaryRange  String?
+  isRemote     Boolean   @default(false)
+  status       String    @default("OPEN")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  country      Country?      @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  applications Application[]
+  coverLetters CoverLetter[]
+
+  @@index([companyId])
+  @@index([countryId])
+  @@index([status])
+  @@index([platform])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+model Resume {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String    @default("Master Resume")
+  fullName  String
+  headline  String
+  summary   String
+  skills    String[]
+  isMaster  Boolean   @default(true)
+  pdfPath   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions     ResumeVersion[]
+  applications Application[]
+
+  @@index([userId])
+  @@map("resumes")
+}
+
+model ResumeVersion {
+  id               String    @id @default(uuid())
+  resumeId         String
+  versionName      String
+  tailoredForJobId String?
+  atsScore         Float?
+  content          String
+  pdfUrl           String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@index([tailoredForJobId])
+  @@map("resume_versions")
+}
+
+model CoverLetter {
+  id          String    @id @default(uuid())
+  jobId       String
+  companyName String
+  jobTitle    String
+  content     String
+  pdfUrl      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([jobId])
+  @@map("cover_letters")
+}
+
+model Application {
+  id                   String    @id @default(uuid())
+  userId               String
+  jobId                String
+  resumeId             String?
+  coverLetterId        String?
+  status               String    @default("QUEUED")
+  atsMatchScore        Float?
+  requireHumanApproval Boolean   @default(true)
+  submittedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resume      Resume?          @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  coverLetter CoverLetter?     @relation(fields: [coverLetterId], references: [id], onDelete: SetNull)
+  logs        ApplicationLog[]
+
+  @@index([userId])
+  @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("applications")
+}
+
+model ApplicationLog {
+  id            String    @id @default(uuid())
+  applicationId String
+  userId        String?
+  level         String    @default("INFO")
+  stepName      String
+  message       String
+  screenshotUrl String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("application_logs")
+}
+
+model EmailLog {
+  id          String    @id @default(uuid())
+  userId      String
+  fromAddress String
+  subject     String
+  snippet     String?
+  category    String    @default("GENERAL")
+  isProcessed Boolean   @default(false)
+  receivedAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@index([receivedAt])
+  @@map("email_logs")
+}
+
+model Setting {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  dailyApplicationLimit Int       @default(15)
+  targetCountries       String[]
+  jobTitles             String[]
+  minimumSalary         Int       @default(0)
+  visaRequired          Boolean   @default(false)
+  remote                Boolean   @default(false)
+  hybrid                Boolean   @default(false)
+  keywords              String[]
+  requireHumanApproval  Boolean   @default(true)
+  autoPilotEnabled      Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("settings")
+}
+
+model Queue {
+  id           String    @id @default(uuid())
+  queueName    String    @default("sentinel-background-tasks")
+  taskType     String
+  payload      String
+  status       String    @default("QUEUED")
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  @@index([status])
+  @@index([queueName])
+  @@index([taskType])
+  @@map("queues")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String    @default("INFO")
+  isRead    Boolean   @default(false)
+  actionUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}

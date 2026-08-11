@@ -1,0 +1,25 @@
+{
+  "name": "ai-job-application-agent-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "check-types": "turbo run check-types",
+    "db:generate": "npm run --prefix apps/backend db:generate",
+    "db:push": "npm run --prefix apps/backend db:push"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

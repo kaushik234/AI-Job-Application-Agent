@@ -1,0 +1,67 @@
+name: Sentinel AI CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  lint-and-test:
+    name: Lint, Typecheck, and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/current-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Validate TypeScript Compilation (Typecheck)
+        run: npm run check-types
+
+      - name: Run Jest Unit & Integration Tests
+        run: npm run test --workspaces
+
+  docker-build-check:
+    name: Build Production Docker Images
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Backend Docker Build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: false
+          tags: sentinel-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Validate Frontend Docker Build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/frontend/Dockerfile
+          push: false
+          tags: sentinel-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
