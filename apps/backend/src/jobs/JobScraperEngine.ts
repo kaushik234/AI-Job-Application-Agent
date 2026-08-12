@@ -259,14 +259,30 @@ export class JobScraperEngine {
     // 8. Top 50 jobs ordered by priority and matchScore
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
-    logger.info('SEARCH', `[JOB_SCRAPE] After deduplication: ${scoredRawJobs.length - duplicatesRemovedCount}`);
     logger.info(
-      'SEARCH',
-      `[JOB_VERIFICATION] After live verification: ${verifiedJobs.length}`
-    );
-    logger.info('SEARCH', `[JOB_SCRAPE] After resume matching: ${scoredRawJobs.length}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] After filters: ${top50Jobs.length}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Returning: ${top50Jobs.length} jobs`);
+        'SEARCH',
+        `[JOB_DEDUP] After deduplication: ${deduplicated.length}`
+      );
+      logger.info(
+        'SEARCH',
+        `[JOB_VERIFICATION] After live verification: ${verifiedJobs.length}`
+      );
+      logger.info(
+        'SEARCH',
+        `[JOB_RELEVANCE] After relevance filtering: ${roleRelevantJobs.length}/${verifiedJobs.length}`
+      );
+      logger.info(
+        'SEARCH',
+        `[JOB_RANKING] After resume ranking: ${scoredRawJobs.length}`
+      );
+      logger.info(
+        'SEARCH',
+        `[JOB_SCRAPE] After top 50 selection: ${top50Jobs.length}`
+      );
+      logger.info(
+        'SEARCH',
+        `[JOB_SCRAPE] Returning: ${top50Jobs.length} jobs`
+      );
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,

@@ -367,6 +367,7 @@ export class JobVerificationService {
    * Only ACTIVE & sourceVerified jobs are eligible.
    */
   public isJobEligibleForApplication(job: JobListing): { eligible: boolean; reason?: string } {
+    // DEMO jobs are never eligible
     if (job.isDemoJob || job.jobStatus === JobLifecycleStatus.DEMO_ONLY) {
       return {
         eligible: false,
@@ -374,6 +375,19 @@ export class JobVerificationService {
       };
     }
 
+    // Source mismatch explicit handling
+    if (job.jobStatus === JobLifecycleStatus.SOURCE_MISMATCH) {
+      const reason = job.verificationReason || job.verificationNotes || 'Source mismatch: generic jobs index detected.';
+      return { eligible: false, reason };
+    }
+
+    // Expired job handling
+    if (job.jobStatus === JobLifecycleStatus.EXPIRED) {
+      const reason = job.verificationReason || job.verificationNotes || 'This job posting has expired';
+      return { eligible: false, reason };
+    }
+
+    // General source verification failure
     if (job.sourceVerified === false || job.verificationStatus !== JobLifecycleStatus.ACTIVE) {
       return {
         eligible: false,
@@ -381,9 +395,7 @@ export class JobVerificationService {
       };
     }
 
-    return {
-      eligible: true,
-    };
+    return { eligible: true };
   }
 
   /**

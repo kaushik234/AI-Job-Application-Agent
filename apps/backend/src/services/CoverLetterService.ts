@@ -10,7 +10,9 @@ import {
   CoverLetterVersion,
 } from '@sentinel/types';
 import { db } from '../database';
+import { calculateResumeExperienceYears } from '../jobs/utils/queryGenerator';
 import { aiService } from './AIService';
+import { formatCandidateExperienceYears } from '../utils/experienceFormatter';
 import { contentFabricationAuditor } from './ContentFabricationAuditor';
 import { logger } from '@sentinel/shared';
 import crypto from 'crypto';
@@ -61,7 +63,7 @@ export class CoverLetterService {
       salutation: rawLetter.salutation || `Dear Hiring Team at ${job.company},`,
       contentParagraphs: rawLetter.contentParagraphs || [
         `I am writing to express my strong enthusiasm for the ${job.title} position at ${job.company}.`,
-        `With over ${master.explicitExperienceYears || 3.8} years of hands-on experience developing cross-platform mobile applications in Flutter and Dart, I have successfully delivered scalable iOS and Android features.`,
+        `With ${formatCandidateExperienceYears(calculateResumeExperienceYears(master))} of hands-on experience developing cross-platform mobile applications in Flutter and Dart, I have successfully delivered scalable iOS and Android features.`,
         `I am particularly impressed by ${job.company}'s engineering focus and would welcome the opportunity to discuss how my technical expertise aligns with your team goals.`,
       ],
       closing: rawLetter.closing || `Sincerely,\n${master.fullName}`,
@@ -87,7 +89,7 @@ export class CoverLetterService {
 
     const auditData = {
       jobId: job.id,
-      candidateProfileVersion: `${master.fullName}_${master.explicitExperienceYears || 3.8}yrs`,
+      candidateProfileVersion: `${master.fullName}_${calculateResumeExperienceYears(master)}yrs`,
       generatedAt: new Date().toISOString(),
       verifiedSkillsUsed: auditResult.report.matchingSkills,
       verifiedExperienceUsed: master.experience.map((e) => `${e.role} at ${e.company}`),

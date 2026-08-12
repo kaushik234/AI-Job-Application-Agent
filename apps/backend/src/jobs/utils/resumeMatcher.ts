@@ -66,7 +66,9 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
   }
 
   if (allTechSkills.length > 0) {
-    const techRatio = matchedTechCount / Math.min(10, allTechSkills.length);
+    // Prevent inflation when candidate has many technologies. Use the larger of 10 or the candidate's tech count as denominator.
+    const denominator = Math.max(10, allTechSkills.length);
+    const techRatio = matchedTechCount / denominator;
     skillPts = Math.round(techRatio * 60);
   }
   skillPts = Math.min(60, skillPts);
@@ -121,11 +123,11 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
  * being completely unrelated to the candidate's role.
  */
 export function isRoleRelevant(
-  job: any,
-  resume?: any | null,
+  job: JobListing,
+  resume?: MasterResume | null,
 ): boolean {
   if (!resume) {
-    return true;
+    return true; // No resume means we can't filter, keep job
   }
 
   const title = (job.title || '').toLowerCase().trim();
@@ -188,6 +190,7 @@ export function isRoleRelevant(
   ];
 
   // Hard reject obviously unrelated roles.
+  // Hard reject obviously unrelated roles.
   if (excludedRoleTerms.some((term) => title.includes(term))) {
     return false;
   }
@@ -214,7 +217,7 @@ export function isRoleRelevant(
   ];
 
   const genericSoftwareTitle = genericSoftwareTitleTerms.some((term) =>
-    title.includes(term),
+    title.includes(term)
   );
 
   const mobileIndicators = [
@@ -231,9 +234,10 @@ export function isRoleRelevant(
   ];
 
   const hasMobileEvidence = mobileIndicators.some((term) =>
-    searchableText.includes(term),
+    searchableText.includes(term)
   );
 
+  // Only accept generic software titles if genuine mobile evidence exists in description/requirements.
   if (genericSoftwareTitle && hasMobileEvidence) {
     return true;
   }
