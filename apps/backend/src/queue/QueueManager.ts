@@ -61,6 +61,7 @@ export interface QueueConfig {
 
 export class QueueManager {
   private redisConnection: Redis | null = null;
+  private workerRedisConnection: Redis | null = null;
   private queues: Map<string, Queue> = new Map();
   private workers: Map<string, Worker> = new Map();
   private isRedisConnected: boolean = false;
@@ -98,40 +99,117 @@ export class QueueManager {
   private initializeRedis(config: QueueConfig) {
     const host = config.redisHost || process.env.REDIS_HOST || 'localhost';
     const port = config.redisPort || parseInt(process.env.REDIS_PORT || '6379', 10);
-    const password = config.redisPassword || process.env.REDIS_PASSWORD || undefined;
+    const password =
+      config.redisPassword || process.env.REDIS_PASSWORD || undefined;
 
     if (config.concurrencyMap) {
-      this.concurrencyMap = { ...this.concurrencyMap, ...config.concurrencyMap };
+      this.concurrencyMap = {
+        ...this.concurrencyMap,
+        ...config.concurrencyMap,
+      };
     }
 
     try {
+      // Connection used by BullMQ Queues / normal Redis commands
       this.redisConnection = new Redis({
         host,
         port,
         password,
+
+        // Queue connections can safely use normal retry behaviour.
         maxRetriesPerRequest: null,
+
+        // Don't queue commands while disconnected.
         enableOfflineQueue: false,
+
         retryStrategy: (times) => {
-          if (times > 3) {
-            logger.warn('QUEUE', `Redis connection unreachable at ${host}:${port}. Operating in Resilient Memory Queue Fallback mode.`);
-            this.isRedisConnected = false;
-            return null; // Stop reconnecting automatically
-          }
-          return Math.min(times * 100, 1000);
+          // Keep reconnecting instead of permanently giving up.
+          return Math.min(times * 200, 3000);
+        },
+      });
+
+      // Separate connection for BullMQ Workers.
+      //
+      // Workers use blocking Redis commands such as BZPOPMIN,
+      // so this connection must be allowed to reconnect.
+      this.workerRedisConnection = new Redis({
+        host,
+        port,
+        password,
+
+        // Required for BullMQ Worker connections.
+        maxRetriesPerRequest: null,
+
+        // IMPORTANT:
+        // Worker needs commands to remain queued while reconnecting.
+        enableOfflineQueue: true,
+
+        retryStrategy: (times) => {
+          return Math.min(times * 200, 3000);
         },
       });
 
       this.redisConnection.on('connect', () => {
         this.isRedisConnected = true;
-        logger.info('QUEUE', `Connected to Redis server at ${host}:${port}`);
+        logger.info(
+          'QUEUE',
+          `Connected to Redis server at ${host}:${port}`
+        );
+      });
+
+      this.redisConnection.on('ready', () => {
+        this.isRedisConnected = true;
+        logger.info('QUEUE', 'Redis connection ready');
+      });
+
+      this.redisConnection.on('close', () => {
+        this.isRedisConnected = false;
+        logger.warn('QUEUE', 'Redis connection closed. Reconnecting...');
       });
 
       this.redisConnection.on('error', (err) => {
         this.isRedisConnected = false;
+        logger.warn(
+          'QUEUE',
+          `Redis connection error: ${err.message}`
+        );
       });
-    } catch (err) {
+
+      this.workerRedisConnection.on('connect', () => {
+        logger.info(
+          'QUEUE',
+          `BullMQ worker Redis connection established`
+        );
+      });
+
+      this.workerRedisConnection.on('ready', () => {
+        logger.info(
+          'QUEUE',
+          `BullMQ worker Redis connection ready`
+        );
+      });
+
+      this.workerRedisConnection.on('close', () => {
+        logger.warn(
+          'QUEUE',
+          `BullMQ worker Redis connection closed. Reconnecting...`
+        );
+      });
+
+      this.workerRedisConnection.on('error', (err) => {
+        logger.warn(
+          'QUEUE',
+          `BullMQ worker Redis error: ${err.message}`
+        );
+      });
+
+    } catch (err: any) {
       this.isRedisConnected = false;
-      logger.warn('QUEUE', 'Redis initialization fallback activated');
+
+      logger.warn(
+        'QUEUE',
+        `Redis initialization fallback activated: ${err?.message || err}`
+      );
     }
   }
 
@@ -231,24 +309,34 @@ export class QueueManager {
   ): Worker | null {
     const concurrency = this.concurrencyMap[queueName] || 3;
 
-    if (this.isRedisConnected && this.redisConnection) {
+    if (this.isRedisConnected && this.workerRedisConnection) {
       try {
         const worker = new Worker(
           queueName,
           async (bullJob: Job) => {
-            logger.info('QUEUE', `[BullMQ Worker] Processing job ${bullJob.id} on queue "${queueName}"`);
+            logger.info(
+              'QUEUE',
+              `[BullMQ Worker] Processing job ${bullJob.id} on queue "${queueName}"`
+            );
+
             const jobData: JobPayload<T> = bullJob.data;
+
             try {
               return await processor(jobData);
             } catch (error: any) {
               if (bullJob.attemptsMade >= (jobData.maxRetries || 3)) {
-                await this.sendToDeadLetterQueue(jobData, error?.message || 'Exceeded maximum retries', bullJob.attemptsMade);
+                await this.sendToDeadLetterQueue(
+                  jobData,
+                  error?.message || 'Exceeded maximum retries',
+                  bullJob.attemptsMade
+                );
               }
+
               throw error;
             }
           },
           {
-            connection: this.redisConnection,
+            connection: this.workerRedisConnection,
             concurrency,
             limiter: this.rateLimitMap[queueName],
           }
@@ -488,12 +576,13 @@ export class QueueManager {
     this.queues.clear();
 
     if (this.redisConnection) {
-      try {
-        await this.redisConnection.quit();
-      } catch (err) {
-        // ignore
-      }
+      await this.redisConnection.quit();
       this.redisConnection = null;
+    }
+
+    if (this.workerRedisConnection) {
+      await this.workerRedisConnection.quit();
+      this.workerRedisConnection = null;
     }
 
     this.isRedisConnected = false;
