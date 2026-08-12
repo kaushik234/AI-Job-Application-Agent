@@ -27,6 +27,7 @@ import { jobEvaluationService } from '../services/JobEvaluationService';
 import { jobRankingService } from '../services/JobRankingService';
 import { db } from '../database';
 import { logger } from '@sentinel/shared';
+import { jobVerificationService } from '../services/JobVerificationService';
 
 export interface SearchEngineCrawlReport {
   mode: 'WORLDWIDE' | 'CUSTOM';
@@ -183,10 +184,50 @@ export class JobScraperEngine {
     const deduplicated = jobDeduplicationService.deduplicateJobs(filteredScrapedJobs);
     const duplicatesRemovedCount = filteredScrapedJobs.length - deduplicated.length;
 
-    // 6. Calculate candidate AI ranking, visa status & application priority on deduplicated jobs
-    const scoredRawJobs = jobRankingService.rankJobs(deduplicated, masterResume);
+    // 6. Verify that every deduplicated job is still live and accessible
+    logger.info(
+      'SEARCH',
+      `[JOB_VERIFICATION] Verifying ${deduplicated.length} deduplicated jobs before ranking/saving`
+    );
 
-    // 7. Persist new unique jobs into database repository
+    const verifiedJobs: JobListing[] = [];
+
+    for (const job of deduplicated) {
+      try {
+        const verifiedJob = await jobVerificationService.verifyJobListing(job);
+
+        if (
+          verifiedJob.sourceVerified === true &&
+          verifiedJob.verificationStatus === 'ACTIVE'
+        ) {
+          verifiedJobs.push(verifiedJob);
+        } else {
+          logger.info(
+            'SEARCH',
+            `[JOB_VERIFICATION] Excluded ${job.company} - ${job.title}: ${verifiedJob.verificationReason || verifiedJob.verificationStatus
+            }`
+          );
+        }
+      } catch (err: any) {
+        logger.error(
+          'ERROR',
+          `[JOB_VERIFICATION] Failed for ${job.company} - ${job.title}: ${err.message}`
+        );
+      }
+    }
+
+    logger.info(
+      'SEARCH',
+      `[JOB_VERIFICATION] Active jobs: ${verifiedJobs.length}/${deduplicated.length}`
+    );
+
+    // 7. Calculate candidate AI ranking only for verified active jobs
+    const scoredRawJobs = jobRankingService.rankJobs(
+      verifiedJobs,
+      masterResume
+    );
+
+    // 8. Persist only verified active jobs
     if (scoredRawJobs.length > 0) {
       await this.jobRepo.saveMany(scoredRawJobs);
     }
@@ -195,6 +236,10 @@ export class JobScraperEngine {
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
     logger.info('SEARCH', `[JOB_SCRAPE] After deduplication: ${scoredRawJobs.length - duplicatesRemovedCount}`);
+    logger.info(
+      'SEARCH',
+      `[JOB_VERIFICATION] After live verification: ${verifiedJobs.length}`
+    );
     logger.info('SEARCH', `[JOB_SCRAPE] After resume matching: ${scoredRawJobs.length}`);
     logger.info('SEARCH', `[JOB_SCRAPE] After filters: ${top50Jobs.length}`);
     logger.info('SEARCH', `[JOB_SCRAPE] Returning: ${top50Jobs.length} jobs`);
