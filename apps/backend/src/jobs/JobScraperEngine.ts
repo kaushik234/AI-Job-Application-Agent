@@ -22,7 +22,10 @@ import {
 } from './providers';
 import { deduplicateJobs } from './utils/deduplication';
 import { deriveSearchQueriesFromResume } from './utils/queryGenerator';
-import { calculateCandidateMatchScore } from './utils/resumeMatcher';
+import {
+  calculateCandidateMatchScore,
+  isRoleRelevant,
+} from './utils/resumeMatcher';
 import { jobEvaluationService } from '../services/JobEvaluationService';
 import { jobRankingService } from '../services/JobRankingService';
 import { db } from '../database';
@@ -221,10 +224,31 @@ export class JobScraperEngine {
       `[JOB_VERIFICATION] Active jobs: ${verifiedJobs.length}/${deduplicated.length}`
     );
 
-    // 7. Calculate candidate AI ranking only for verified active jobs
+    // 7. Filter verified jobs by actual career/role relevance
+    const roleRelevantJobs: JobListing[] = [];
+
+    for (const job of verifiedJobs) {
+      const relevant = isRoleRelevant(job, masterResume);
+
+      if (relevant) {
+        roleRelevantJobs.push(job);
+      } else {
+        logger.info(
+          'SEARCH',
+          `[JOB_RELEVANCE] Excluded ${job.company} - ${job.title}: role is not relevant to candidate profile`,
+        );
+      }
+    }
+
+    logger.info(
+      'SEARCH',
+      `[JOB_RELEVANCE] Relevant jobs: ${roleRelevantJobs.length}/${verifiedJobs.length}`,
+    );
+
+    // 8. Calculate candidate ranking only for verified + relevant jobs
     const scoredRawJobs = jobRankingService.rankJobs(
-      verifiedJobs,
-      masterResume
+      roleRelevantJobs,
+      masterResume,
     );
 
     // 8. Persist only verified active jobs
