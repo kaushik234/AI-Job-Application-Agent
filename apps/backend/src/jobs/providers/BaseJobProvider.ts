@@ -20,6 +20,8 @@ export interface JobSearchQuery {
 export interface PaginationOptions {
   page?: number;
   limit?: number;
+  targetLimit?: number;
+  maxPages?: number;
 }
 
 export interface PaginatedJobResults {
@@ -71,9 +73,9 @@ export abstract class BaseJobProvider {
   /**
    * Helper to compute standard offset and limits for pagination
    */
-  public pagination(page: number = 1, limit: number = 10): { offset: number; limit: number; page: number } {
+  public pagination(page: number = 1, limit: number = 50): { offset: number; limit: number; page: number } {
     const safePage = Math.max(1, page);
-    const safeLimit = Math.max(1, Math.min(100, limit));
+    const safeLimit = Math.max(1, Math.min(100, limit || 50));
     const offset = (safePage - 1) * safeLimit;
     return { offset, limit: safeLimit, page: safePage };
   }

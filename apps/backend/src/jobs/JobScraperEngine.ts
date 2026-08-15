@@ -71,7 +71,7 @@ export class JobScraperEngine {
    */
   public async executeParallelCrawl(
     query: JobSearchQuery = {},
-    pagination: PaginationOptions = { page: 1, limit: 10 }
+    pagination: PaginationOptions = { page: 1, limit: 50 }
   ): Promise<SearchEngineCrawlReport> {
     const visaOnly = query.visaOnly === true;
     const remoteOnly = query.remoteOnly === true;
@@ -113,12 +113,48 @@ export class JobScraperEngine {
 
     const providerBreakdown: Record<string, { scraped: number; status: string; message?: string }> = {};
 
-    // 4. Execute provider searches concurrently
+    const pageLimit = pagination.limit || 50;
+    const targetCollectionLimit = pagination.targetLimit || 150;
+    const maxPagesSafetyLimit = pagination.maxPages || 10;
+
+    // 4. Execute provider searches concurrently with proper multi-page iteration
     const searchPromises = this.providers.map(async (provider) => {
       try {
-        const result = await provider.search(searchQuery, pagination);
-        providerBreakdown[provider.platform] = { scraped: result.jobs.length, status: 'SUCCESS' };
-        return result.jobs;
+        const providerJobs: JobListing[] = [];
+        const seenIds = new Set<string>();
+        let currentPage = pagination.page || 1;
+        let pagesFetched = 0;
+
+        while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
+          const result = await provider.search(searchQuery, { page: currentPage, limit: pageLimit });
+          pagesFetched++;
+
+          if (!result || !result.jobs || result.jobs.length === 0) {
+            break;
+          }
+
+          for (const job of result.jobs) {
+            const key = job.id || job.url;
+            if (!seenIds.has(key)) {
+              seenIds.add(key);
+              providerJobs.push(job);
+            }
+          }
+
+          if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
+            break;
+          }
+
+          currentPage++;
+        }
+
+        logger.info(
+          'SEARCH',
+          `[JOB_COLLECTION]\nProvider: ${provider.platform}\nCollected: ${providerJobs.length}\nTarget: ${targetCollectionLimit}\nPagesFetched: ${pagesFetched}`
+        );
+
+        providerBreakdown[provider.platform] = { scraped: providerJobs.length, status: 'SUCCESS' };
+        return providerJobs;
       } catch (err: any) {
         logger.error('ERROR', `Crawl failed for provider ${provider.platform}: ${err.message}`);
         providerBreakdown[provider.platform] = { scraped: 0, status: 'FAILED', message: err.message };

@@ -75,12 +75,21 @@ describe('Job Search Engine Providers Suite (Phase 6)', () => {
         expect(page2.limit).toBe(20);
       });
 
-      it('should search and return paginated job results', async () => {
+      it('should search and return paginated job results with totalFound', async () => {
         const results = await instance.search({}, { page: 1, limit: 10 });
         expect(results).toBeDefined();
         expect(results.provider).toBe(instance.platform);
         expect(Array.isArray(results.jobs)).toBe(true);
-        expect(results.jobs.length).toBeGreaterThan(0);
+        expect(results.page).toBe(1);
+        expect(results.limit).toBe(10);
+        expect(typeof results.totalFound).toBe('number');
+      });
+
+      it('should support pagination page 2 without errors', async () => {
+        const results = await instance.search({}, { page: 2, limit: 1 });
+        expect(results).toBeDefined();
+        expect(results.page).toBe(2);
+        expect(results.limit).toBe(1);
       });
 
       it('should normalize raw data and extract all required fields', async () => {

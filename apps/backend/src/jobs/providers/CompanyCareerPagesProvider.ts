@@ -129,6 +129,10 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
         'SEARCH',
         `[JOB_SOURCE] Provider: Company Career Page | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length}`
       );
+      logger.info(
+        'SEARCH',
+        `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: ${paginatedSlice.length}\nTotalAvailable: ${filtered.length}`
+      );
 
       return {
         provider: this.platform,

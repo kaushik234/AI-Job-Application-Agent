@@ -15,6 +15,7 @@ export class IndeedProvider extends BaseJobProvider {
 
   public async search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
     return this.retry(async () => {
+      const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
       const publisherId = process.env.INDEED_PUBLISHER_ID;
 
       if (!publisherId && process.env.NODE_ENV !== 'test') {
@@ -24,11 +25,15 @@ export class IndeedProvider extends BaseJobProvider {
           'SEARCH',
           `[JOB_SOURCE] Provider: Indeed | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: 0`
         );
+        logger.info(
+          'SEARCH',
+          `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: 0\nTotalAvailable: 0`
+        );
         return {
           provider: this.platform,
           totalFound: 0,
-          page: pagination?.page || 1,
-          limit: pagination?.limit || 10,
+          page,
+          limit,
           jobs: [],
         };
       }
@@ -63,18 +68,24 @@ export class IndeedProvider extends BaseJobProvider {
         });
       }
 
+      const paginatedSlice = sample.slice(offset, offset + limit);
+
       const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
       logger.info(
         'SEARCH',
         `[JOB_SOURCE] Provider: Indeed | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${sample.length}`
       );
+      logger.info(
+        'SEARCH',
+        `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: ${paginatedSlice.length}\nTotalAvailable: ${sample.length}`
+      );
 
       return {
         provider: this.platform,
         totalFound: sample.length,
-        page: pagination?.page || 1,
-        limit: pagination?.limit || 10,
-        jobs: sample,
+        page,
+        limit,
+        jobs: paginatedSlice,
       };
     });
   }

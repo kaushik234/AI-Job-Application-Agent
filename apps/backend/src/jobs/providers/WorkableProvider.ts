@@ -95,6 +95,10 @@ export class WorkableProvider extends BaseJobProvider {
         'SEARCH',
         `[JOB_SOURCE] Provider: Workable | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length}`
       );
+      logger.info(
+        'SEARCH',
+        `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: ${paginatedSlice.length}\nTotalAvailable: ${filtered.length}`
+      );
 
       return {
         provider: this.platform,
