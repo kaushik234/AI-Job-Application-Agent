@@ -141,12 +141,16 @@ export class JobRankingService {
     const isVisaBlocked = visaStatus === 'NO_SPONSORSHIP' || visaStatus === 'NOT_ELIGIBLE';
     const isSevereExperienceGap = experienceGap !== null && experienceGap > 2.5;
     const isUnrelatedRole = roleMatchScore < 55;
+    const isZeroSkillMatchMismatch = matchedSkills.length === 0 && requiredSkillEvidence.length > 0 && roleMatchScore < 55;
 
-    if (isVisaBlocked || isSevereExperienceGap || isUnrelatedRole) {
+    if (isZeroSkillMatchMismatch || isUnrelatedRole) {
+      matchScore = Math.min(35, matchScore);
+      recommendation = 'SKIP';
+    } else if (isVisaBlocked || isSevereExperienceGap) {
       if (recommendation === 'APPLY_NOW') {
         recommendation = 'TAILOR_AND_APPLY';
       }
-      if (isVisaBlocked || isUnrelatedRole || (experienceGap !== null && experienceGap > 4.0)) {
+      if (isVisaBlocked || (experienceGap !== null && experienceGap > 4.0)) {
         recommendation = 'SKIP';
       }
     }
@@ -459,8 +463,23 @@ export class JobRankingService {
       return { roleMatchScore: 92, roleEvidence };
     }
 
+    const hasCandidateFlutter = candidateProfile.skills.some((s) => s.toLowerCase().includes('flutter') || s.toLowerCase().includes('dart'));
+    const hasCandidateAndroidNative = candidateProfile.skills.some((s) => s.toLowerCase().includes('kotlin') || s.toLowerCase().includes('android sdk'));
+    const hasCandidateIosNative = candidateProfile.skills.some((s) => s.toLowerCase().includes('swift') || s.toLowerCase().includes('uikit'));
+
+    // Specific technology alignment check (Flutter candidate vs native Android/iOS role)
+    if (hasCandidateFlutter && !hasCandidateAndroidNative && (jobTitleLower.includes('android') || jobTitleLower.includes('aosp'))) {
+      roleEvidence.push(`Candidate specializes in Flutter/Dart; verified role is native Android systems engineering.`);
+      return { roleMatchScore: 15, roleEvidence };
+    }
+
+    if (hasCandidateFlutter && !hasCandidateIosNative && (jobTitleLower.includes('ios') || jobTitleLower.includes('swift'))) {
+      roleEvidence.push(`Candidate specializes in Flutter/Dart; verified role is native iOS engineering.`);
+      return { roleMatchScore: 15, roleEvidence };
+    }
+
     // Category / tech keywords check
-    const mobileKeywords = ['flutter', 'dart', 'mobile', 'android', 'ios'];
+    const mobileKeywords = ['flutter', 'dart', 'mobile'];
     const backendKeywords = ['backend', 'node', 'express', 'python', 'go', 'java', 'sql', 'postgresql'];
     const cloudKeywords = ['cloud', 'analytics', 'aws', 'gcp', 'docker', 'devops'];
     const pastryKeywords = ['baker', 'pastry', 'chef', 'food', 'cook'];
@@ -509,8 +528,6 @@ export class JobRankingService {
     const partialMappings: Record<string, string[]> = {
       javascript: ['typescript', 'node.js'],
       typescript: ['javascript'],
-      android: ['flutter', 'kotlin'],
-      ios: ['flutter', 'swift'],
     };
 
     let totalPoints = 0;

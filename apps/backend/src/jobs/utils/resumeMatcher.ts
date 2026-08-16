@@ -1,24 +1,135 @@
 /**
  * @file src/jobs/utils/resumeMatcher.ts
- * @description Dynamic deterministic candidate resume matching algorithm calculating real ATS compatibility scores.
+ * @description Dynamic candidate resume matching and role relevance validation engine.
  */
 
 import { JobListing, MasterResume } from '@sentinel/types';
 import { calculateResumeExperienceYears } from './queryGenerator';
 
+export interface CandidateTargetProfile {
+  primaryRoles: string[];
+  coreTechnologies: string[];
+  secondaryTechnologies: string[];
+  roleFamilies: string[];
+  prohibitedRoleTerms: string[];
+  seniority: 'Junior' | 'Mid' | 'Senior' | 'Lead';
+  experienceYears: number;
+}
+
+/**
+ * Derives a generic CandidateTargetProfile from a MasterResume.
+ * Does NOT hardcode any candidate-specific strings statically.
+ */
+export function deriveCandidateTargetProfile(resume?: MasterResume | null): CandidateTargetProfile {
+  const languages = (resume?.skills?.languages || []).map((s) => s.toLowerCase().trim());
+  const frameworks = (resume?.skills?.frameworks || []).map((s) => s.toLowerCase().trim());
+  const databases = (resume?.skills?.databases || []).map((s) => s.toLowerCase().trim());
+  const tools = (resume?.skills?.tools || []).map((s) => s.toLowerCase().trim());
+  const cloud = (resume?.skills?.cloudAndDevOps || []).map((s) => s.toLowerCase().trim());
+
+  const allSkills = Array.from(new Set([...languages, ...frameworks, ...databases, ...tools, ...cloud])).filter((s) => s.length > 0);
+
+  const experienceYears = resume ? calculateResumeExperienceYears(resume) : 3;
+  let seniority: 'Junior' | 'Mid' | 'Senior' | 'Lead' = 'Mid';
+  if (experienceYears >= 6) seniority = 'Senior';
+  else if (experienceYears < 2) seniority = 'Junior';
+
+  const primaryRoles = (resume?.experience || [])
+    .map((e) => e.role)
+    .filter((r): r is string => !!r && r.trim().length > 0);
+
+  if (primaryRoles.length === 0) {
+    if (frameworks.includes('flutter') || languages.includes('dart')) {
+      primaryRoles.push('Flutter Developer');
+    } else if (languages.includes('kotlin') || frameworks.includes('android')) {
+      primaryRoles.push('Android Developer');
+    } else if (languages.includes('swift') || frameworks.includes('uikit')) {
+      primaryRoles.push('iOS Developer');
+    } else {
+      primaryRoles.push('Software Engineer');
+    }
+  }
+
+  const coreTechnologies: string[] = [];
+  const roleFamilies: string[] = [];
+
+  const hasFlutter = allSkills.some((s) => s.includes('flutter') || s.includes('dart'));
+  const hasAndroidNative = allSkills.some((s) => s.includes('kotlin') || s.includes('android sdk') || s.includes('aosp') || s.includes('jetpack'));
+  const hasIosNative = allSkills.some((s) => s.includes('swift') || s.includes('uikit') || s.includes('xcode') || s.includes('objective-c'));
+  const hasWebFrontend = allSkills.some((s) => s.includes('react') || s.includes('vue') || s.includes('angular') || s.includes('next') || s.includes('typescript'));
+  const hasBackend = allSkills.some((s) => s.includes('node') || s.includes('express') || s.includes('python') || s.includes('django') || s.includes('java') || s.includes('spring') || s.includes('golang') || s.includes('go'));
+
+  if (hasFlutter) {
+    coreTechnologies.push('flutter', 'dart');
+    roleFamilies.push('flutter', 'cross_platform_mobile', 'mobile');
+  }
+  if (hasAndroidNative) {
+    coreTechnologies.push('kotlin', 'java', 'android sdk');
+    roleFamilies.push('native_android', 'mobile');
+  }
+  if (hasIosNative) {
+    coreTechnologies.push('swift', 'uikit', 'ios sdk');
+    roleFamilies.push('native_ios', 'mobile');
+  }
+  if (hasWebFrontend) {
+    roleFamilies.push('web_frontend');
+  }
+  if (hasBackend) {
+    roleFamilies.push('backend_systems');
+  }
+
+  const prohibitedRoleTerms: string[] = [];
+  // If candidate is a Flutter / Cross Platform candidate WITHOUT native Android skills in their resume:
+  if (hasFlutter && !hasAndroidNative) {
+    prohibitedRoleTerms.push(
+      'android systems engineer',
+      'android platform engineer',
+      'android framework engineer',
+      'android os engineer',
+      'android infrastructure engineer',
+      'android engineer',
+      'android developer',
+      'android sdk'
+    );
+  }
+  // If candidate lacks native iOS skills:
+  if (hasFlutter && !hasIosNative) {
+    prohibitedRoleTerms.push(
+      'ios engineer',
+      'ios developer',
+      'ios sdk engineer',
+      'swift engineer'
+    );
+  }
+  // Unrelated low-level or non-mobile systems engineering (unless candidate has hardware/c++ skills)
+  if (hasFlutter && !allSkills.some((s) => s.includes('c++') || s.includes('embedded') || s.includes('firmware'))) {
+    prohibitedRoleTerms.push(
+      'camera firmware engineer',
+      'camera software engineer',
+      'embedded engineer',
+      'firmware engineer',
+      'c++ systems engineer',
+      'aosp engineer'
+    );
+  }
+
+  return {
+    primaryRoles,
+    coreTechnologies: Array.from(new Set(coreTechnologies)),
+    secondaryTechnologies: allSkills.filter((s) => !coreTechnologies.includes(s)),
+    roleFamilies: Array.from(new Set(roleFamilies)),
+    prohibitedRoleTerms,
+    seniority,
+    experienceYears,
+  };
+}
+
 /**
  * Calculates a dynamic, candidate-specific ATS compatibility match score (0-100%)
- * based on 11 deterministic dimensions with fixed weightings:
- * - Skills & Core Tech (35%)
- * - Technologies & Frameworks (25%)
- * - Job Title & Role Similarity (20%)
- * - Seniority & Experience Alignment (10%)
- * - Location & Remote Preferences (5%)
- * - Visa Sponsorship & Other Factors (5%)
  */
 export function calculateCandidateMatchScore(job: JobListing, resume?: MasterResume | null): number {
   if (!resume) {
-    return 75; // Default baseline if no resume uploaded
+    return 75;
   }
 
   const titleLower = (job.title || '').toLowerCase();
@@ -42,7 +153,6 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
       }
     }
   }
-  // Title role overlap check
   if (titleLower.includes('developer') || titleLower.includes('engineer') || titleLower.includes('architect')) {
     rolePts += 4;
   }
@@ -66,7 +176,6 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
   }
 
   if (allTechSkills.length > 0) {
-    // Prevent inflation when candidate has many technologies. Use the larger of 10 or the candidate's tech count as denominator.
     const denominator = Math.max(10, allTechSkills.length);
     const techRatio = matchedTechCount / denominator;
     skillPts = Math.round(techRatio * 60);
@@ -107,7 +216,6 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
 
   const totalScore = rolePts + skillPts + seniorityPts + locationPts + visaPts;
 
-  // Unrelated job penalty (e.g. painter searched against software engineer resume)
   if (matchedTechCount === 0 && rolePts <= 4) {
     return Math.min(25, Math.max(10, totalScore));
   }
@@ -117,17 +225,14 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
 
 /**
  * Determines whether a job belongs to the candidate's actual career/role family.
- *
- * This is intentionally stricter than the numeric match score.
- * A job can mention Flutter/JavaScript/etc. in its description while still
- * being completely unrelated to the candidate's role.
  */
 export function isRoleRelevant(
   job: JobListing,
   resume?: MasterResume | null,
+  userQuery?: string
 ): boolean {
   if (!resume) {
-    return true; // No resume means we can't filter, keep job
+    return true;
   }
 
   const title = (job.title || '').toLowerCase().trim();
@@ -136,95 +241,89 @@ export function isRoleRelevant(
     ? job.requirements.join(' ').toLowerCase()
     : '';
 
-  const searchableText = `${title} ${description} ${requirements}`;
+  const fullContent = `${title} ${description} ${requirements}`;
 
-  // Clearly unrelated job families.
+  // Excluded non-engineering roles
   const excludedRoleTerms = [
-    'account director',
-    'account executive',
-    'account manager',
-    'sales director',
-    'sales manager',
-    'sales executive',
-    'marketing manager',
-    'marketing director',
-    'recruiter',
-    'recruitment',
-    'human resources',
-    'hr manager',
-    'finance manager',
-    'financial analyst',
-    'legal counsel',
-    'lawyer',
-    'operations manager',
-    'project coordinator',
-    'administrative',
-    'customer success',
-    'customer support',
-    'technical writer',
-    'content writer',
-    'copywriter',
-    'technical program manager',
-    'program manager',
-    'product manager',
-    'product designer',
+    'account director', 'account executive', 'account manager', 'sales director',
+    'sales manager', 'sales executive', 'marketing manager', 'marketing director',
+    'recruiter', 'recruitment', 'human resources', 'hr manager', 'finance manager',
+    'financial analyst', 'legal counsel', 'lawyer', 'operations manager',
+    'project coordinator', 'administrative', 'customer success', 'customer support',
+    'technical writer', 'content writer', 'copywriter', 'technical program manager',
+    'program manager', 'product manager', 'product designer',
   ];
 
-  // Hard reject obviously unrelated non-engineering roles.
   if (excludedRoleTerms.some((term) => title.includes(term))) {
     return false;
   }
 
-  // 1. Dynamic candidate skills & role keywords from resume
-  const candidateSkills = [
-    ...(resume.skills?.languages || []),
-    ...(resume.skills?.frameworks || []),
-    ...(resume.skills?.databases || []),
-    ...(resume.skills?.tools || []),
-    ...(resume.skills?.cloudAndDevOps || []),
-  ].map((s) => s.toLowerCase().trim()).filter((s) => s.length > 1);
+  const userQueryClean = (userQuery || '').toLowerCase().trim();
 
-  const candidateRoles = (resume.experience || [])
-    .map((e) => (e.role || '').toLowerCase().trim())
-    .filter((r) => r.length > 0);
-
-  const isFlutterMobileCandidate = candidateSkills.some((s) => s.includes('flutter') || s.includes('dart') || s.includes('mobile'));
-
-  const targetRoleTerms: string[] = [];
-  if (isFlutterMobileCandidate) {
-    targetRoleTerms.push('flutter', 'dart', 'mobile developer', 'mobile engineer', 'mobile application', 'cross platform', 'cross-platform', 'ios', 'android');
+  // BUG 6: CUSTOM SEARCH INTENT OVERRIDES DEFAULT PROFILE TARGET
+  if (userQueryClean.length > 0) {
+    if (userQueryClean.includes('android')) {
+      if (title.includes('android') || fullContent.includes('android')) {
+        return true;
+      }
+    }
+    if (userQueryClean.includes('ios') || userQueryClean.includes('swift')) {
+      if (title.includes('ios') || fullContent.includes('swift')) {
+        return true;
+      }
+    }
+    if (userQueryClean.includes('flutter')) {
+      return title.includes('flutter') || fullContent.includes('flutter') || fullContent.includes('dart');
+    }
+    if (userQueryClean.includes('backend') || userQueryClean.includes('go') || userQueryClean.includes('python')) {
+      return title.includes('backend') || fullContent.includes('backend') || fullContent.includes(userQueryClean);
+    }
   }
 
-  for (const role of candidateRoles) {
-    targetRoleTerms.push(role);
-  }
+  // WORLDWIDE MODE (or no explicit query override): ENFORCE CANDIDATE TARGET PROFILE
+  const targetProfile = deriveCandidateTargetProfile(resume);
 
-  // Strongest signal: job title matches candidate target terms
-  if (targetRoleTerms.some((term) => term.length > 2 && title.includes(term))) {
-    return true;
-  }
+  const isFlutterCandidate = targetProfile.coreTechnologies.includes('flutter');
 
-  // Generic software engineering titles
-  const genericSoftwareTitleTerms = [
-    'software engineer',
-    'software developer',
-    'application engineer',
-    'application developer',
-    'full stack engineer',
-    'full-stack engineer',
-    'full stack developer',
-    'full-stack developer',
-    'backend engineer',
-    'frontend engineer',
-  ];
-
-  const isGenericSoftwareTitle = genericSoftwareTitleTerms.some((term) => title.includes(term));
-
-  if (isGenericSoftwareTitle) {
-    const hasSkillMatch = candidateSkills.some((skill) => searchableText.includes(skill));
-    if (hasSkillMatch || candidateSkills.length === 0) {
+  if (isFlutterCandidate) {
+    const isFlutterTitle = title.includes('flutter') || title.includes('dart');
+    if (isFlutterTitle) {
       return true;
     }
+
+    const isProhibitedTitle = targetProfile.prohibitedRoleTerms.some((term) => title.includes(term));
+    if (isProhibitedTitle) {
+      const hasExplicitFlutterRequirement = fullContent.includes('flutter') || fullContent.includes('dart');
+      if (!hasExplicitFlutterRequirement) {
+        return false;
+      }
+    }
+
+    const isMobileTitle = title.includes('mobile developer') || title.includes('mobile engineer') || title.includes('cross platform') || title.includes('software engineer - mobile');
+    const isGenericTitle = title.includes('software engineer') || title.includes('software developer') || title.includes('full stack') || title.includes('full-stack');
+
+    if (isMobileTitle || isGenericTitle) {
+      const hasFlutterOrDart = fullContent.includes('flutter') || fullContent.includes('dart') || fullContent.includes('cross-platform') || fullContent.includes('cross platform');
+      if (hasFlutterOrDart) {
+        return true;
+      }
+      const isExplicitlyNativeOnly = (fullContent.includes('kotlin') || fullContent.includes('aosp') || fullContent.includes('uikit')) && !hasFlutterOrDart;
+      if (isGenericTitle && !isExplicitlyNativeOnly) {
+        return true;
+      }
+      if (isMobileTitle && !isExplicitlyNativeOnly) {
+        return true;
+      }
+      return false;
+    }
+  } else {
+    const candidateSkills = [
+      ...(resume.skills?.languages || []),
+      ...(resume.skills?.frameworks || []),
+    ].map((s) => s.toLowerCase());
+
+    const hasSkillMatch = candidateSkills.some((skill) => skill.length > 2 && fullContent.includes(skill));
+    if (hasSkillMatch) return true;
   }
 
   return false;

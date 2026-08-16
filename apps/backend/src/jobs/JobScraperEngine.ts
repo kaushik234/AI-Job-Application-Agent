@@ -25,6 +25,7 @@ import { deriveSearchQueriesFromResume } from './utils/queryGenerator';
 import {
   calculateCandidateMatchScore,
   isRoleRelevant,
+  deriveCandidateTargetProfile,
 } from './utils/resumeMatcher';
 import { jobEvaluationService } from '../services/JobEvaluationService';
 import { jobRankingService } from '../services/JobRankingService';
@@ -329,9 +330,23 @@ export class JobScraperEngine {
 
     // 9. Filter verified + relevant jobs by candidate role relevance
     const roleRelevantJobs: JobListing[] = [];
+    const candidateTarget = deriveCandidateTargetProfile(masterResume);
 
     for (const job of searchRelevantJobs) {
-      const relevant = isRoleRelevant(job, masterResume);
+      const relevant = isRoleRelevant(job, masterResume, userSearchTerm);
+      const ranking = jobRankingService.rankJob(job, masterResume);
+
+      const decisionStr =
+        job.sourceVerified === true &&
+        job.verificationStatus === 'ACTIVE' &&
+        relevant
+          ? 'ACCEPT'
+          : (!relevant ? 'REJECT_ROLE_NOT_RELEVANT' : `REJECT_${job.verificationStatus}`);
+
+      logger.info(
+        'SEARCH',
+        `[JOB_DECISION]\ncompany=${job.company}\ntitle=${job.title}\nmode=${mode}\ndiscoveryQuery="${(job as any).discoveryQuery || ''}"\nuserQuery="${userSearchTerm}"\ncandidatePrimaryRole="${candidateTarget.primaryRoles.join(', ')}"\ncandidateCoreTechnologies="${candidateTarget.coreTechnologies.join(',')}"\nsearchRelevant=${job.searchRelevance?.searchRelevanceVerified ?? true}\nroleRelevant=${relevant}\nmatchedCoreSkills=${ranking.strengths.length}\nmissingCoreSkills="${ranking.missingSkills.join(',')}"\nverifiedCountry=${job.verifiedCountry || job.country}\napplyability=${job.applyabilityStatus || 'UNVERIFIED'}\nrecommendation=${ranking.recommendation}\nfinalDecision=${decisionStr}`
+      );
 
       if (relevant) {
         roleRelevantJobs.push(job);
@@ -339,7 +354,7 @@ export class JobScraperEngine {
         rejectionStats.ROLE_NOT_RELEVANT++;
         logger.info(
           'SEARCH',
-          `[JOB_RELEVANCE] Excluded ${job.company} - ${job.title}: role is not relevant to candidate profile`,
+          `[JOB_RELEVANCE] Excluded ${job.company} - ${job.title}: role is not relevant to candidate profile`
         );
       }
     }

@@ -54,14 +54,14 @@ export class CompanyClassificationService {
   public classifyCompanyType(job: JobListing): CompanyType {
     const text = `${job.company} ${job.description || ''}`.toLowerCase();
 
-    if (/saas|software as a service|b2b software|cloud platform/i.test(text)) return 'SaaS';
-    if (/fintech|finance|banking|payments|crypto|trading/i.test(text)) return 'FinTech';
-    if (/healthtech|health|medical|biotech|care/i.test(text)) return 'HealthTech';
-    if (/agency|consulting|digital studio|client projects|software house/i.test(text)) return 'Agency';
-    if (/ecommerce|e-commerce|retail|marketplace|shopping/i.test(text)) return 'ECommerce';
-    if (/startup|seed|venture|founding/i.test(text)) return 'Startup';
-    if (/remote-first|fully remote|distributed team/i.test(text)) return 'Remote';
-    if (/product company|software product/i.test(text)) return 'Product';
+    if (/\b(?:saas|software as a service|b2b software|cloud platform)\b/i.test(text)) return 'SaaS';
+    if (/\b(?:fintech|financial technology|banking|payments|crypto|trading)\b/i.test(text)) return 'FinTech';
+    if (/\b(?:healthtech|healthcare|health tech|biotech|medical devices)\b/i.test(text)) return 'HealthTech';
+    if (/\b(?:agency|consulting|digital studio|software house)\b/i.test(text)) return 'Agency';
+    if (/\b(?:ecommerce|e-commerce|online retail|marketplace)\b/i.test(text)) return 'ECommerce';
+    if (/\b(?:startup|seed stage|series a|founding team)\b/i.test(text)) return 'Startup';
+    if (/\b(?:remote-first|fully remote)\b/i.test(text)) return 'Remote';
+    if (/\b(?:software product company|product company)\b/i.test(text)) return 'Product';
 
     return 'Unknown';
   }

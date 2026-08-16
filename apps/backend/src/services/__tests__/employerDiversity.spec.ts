@@ -80,7 +80,8 @@ describe('Employer Diversity & Scraper Isolation Spec Suite', () => {
       };
 
       expect(isRoleRelevant(flutterJob, sampleResume)).toBe(true);
-      expect(isRoleRelevant(backendJob, sampleResume)).toBe(true);
+      expect(isRoleRelevant(backendJob, sampleResume, 'backend')).toBe(true);
+      expect(isRoleRelevant(backendJob, sampleResume)).toBe(false);
     });
 
     test('Rejects non-engineering roles (Sales, HR, Recruiter)', () => {

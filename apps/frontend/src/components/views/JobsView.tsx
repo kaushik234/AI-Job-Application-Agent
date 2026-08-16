@@ -658,16 +658,31 @@ export const JobsView: React.FC<JobsViewProps> = ({
                     >
                       Tailor
                     </Button>
-                    <Button
-                      variant={job.sourceVerified || job.isDemoJob ? 'primary' : 'outline'}
-                      size="sm"
-                      onClick={() => handlePrepareApplication(job)}
-                      isLoading={actionLoadingJobId === job.id}
-                      title={job.sourceVerified || job.isDemoJob ? 'Prepare Application' : 'Re-verify Job'}
-                      icon={<Play className="w-3.5 h-3.5 fill-current" />}
-                    >
-                      {job.sourceVerified || job.isDemoJob ? 'Apply' : 'Re-verify'}
-                    </Button>
+                    {(() => {
+                      const isApplyable = (job.sourceVerified || job.isDemoJob) && job.applyabilityStatus === 'APPLY_NOW' && recommendation !== 'SKIP' && recommendation !== 'DO_NOT_APPLY';
+                      const isViewOnly = job.applyabilityStatus === 'VIEW_ONLY' || recommendation === 'SKIP' || recommendation === 'DO_NOT_APPLY';
+
+                      return (
+                        <Button
+                          variant={isApplyable ? 'primary' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            if (isViewOnly) {
+                              window.open(job.url || job.originalUrl, '_blank');
+                            } else if (isApplyable) {
+                              handlePrepareApplication(job);
+                            } else {
+                              handleVerifyJob(job.id);
+                            }
+                          }}
+                          isLoading={actionLoadingJobId === job.id}
+                          title={isViewOnly ? 'View External Job Posting' : (isApplyable ? 'Prepare Application' : 'Re-verify Job')}
+                          icon={isViewOnly ? <ExternalLink className="w-3.5 h-3.5 text-blue-400" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                        >
+                          {isViewOnly ? 'View Job' : (isApplyable ? 'Apply' : 'Re-verify')}
+                        </Button>
+                      );
+                    })()}
                   </div>
                 </div>
               </Card>
