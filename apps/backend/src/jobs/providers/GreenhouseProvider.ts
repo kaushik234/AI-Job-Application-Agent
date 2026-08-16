@@ -45,9 +45,11 @@ export class GreenhouseProvider extends BaseJobProvider {
         await Promise.all(
           GREENHOUSE_BOARDS.map(async (boardToken) => {
             try {
+              const signals = [AbortSignal.timeout(8000)];
+              if (pagination?.signal) signals.push(pagination.signal);
               const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`, {
                 headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.any(signals),
               });
 
               if (!res.ok) return;

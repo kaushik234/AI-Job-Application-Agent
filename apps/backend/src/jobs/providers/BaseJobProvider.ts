@@ -22,6 +22,7 @@ export interface PaginationOptions {
   limit?: number;
   targetLimit?: number;
   maxPages?: number;
+  signal?: AbortSignal;
 }
 
 export type ProviderOutcomeStatus =

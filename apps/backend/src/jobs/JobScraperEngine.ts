@@ -112,71 +112,80 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
+    const PRIMARY_DISCOVERY_QUERY_LIMIT = 5;
+
     const activeSubQueries = derived.userQuery
       ? [derived.userQuery]
-      : (derived.keywords && derived.keywords.length > 0 ? derived.keywords.slice(0, 10) : ['Software Engineer']);
+      : (derived.primaryQueries && derived.primaryQueries.length > 0
+          ? derived.primaryQueries.slice(0, PRIMARY_DISCOVERY_QUERY_LIMIT)
+          : (derived.keywords || ['Software Engineer']).slice(0, PRIMARY_DISCOVERY_QUERY_LIMIT));
 
     // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {
+      const controller = new AbortController();
+      const timeoutMs = 12000;
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
       try {
         logger.info('SEARCH', `[PROVIDER_START] provider=${provider.platform}`);
-        const providerTask = async () => {
-          const providerJobs: JobListing[] = [];
-          const seenIds = new Set<string>();
+        const providerJobs: JobListing[] = [];
+        const seenIds = new Set<string>();
 
-          for (const subQuery of activeSubQueries) {
-            if (providerJobs.length >= targetCollectionLimit) break;
+        for (const subQuery of activeSubQueries) {
+          if (controller.signal.aborted) break;
+          if (providerJobs.length >= targetCollectionLimit) break;
 
-            const currentSearchQuery: JobSearchQuery = {
-              ...searchQuery,
-              q: subQuery,
-              userQuery: subQuery,
-              keywords: [subQuery],
-            };
+          const currentSearchQuery: JobSearchQuery = {
+            ...searchQuery,
+            q: subQuery,
+            userQuery: subQuery,
+            keywords: [subQuery],
+          };
 
-            if (!provider.supports(currentSearchQuery)) continue;
+          if (!provider.supports(currentSearchQuery)) continue;
 
-            let currentPage = pagination.page || 1;
-            let pagesFetched = 0;
+          let currentPage = pagination.page || 1;
+          let pagesFetched = 0;
 
-            while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
-              logger.info('SEARCH', `[DISCOVERY_START] provider=${provider.platform} query="${subQuery}" page=${currentPage}`);
-              const result = await provider.search(currentSearchQuery, { page: currentPage, limit: pageLimit });
-              pagesFetched++;
+          while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
+            if (controller.signal.aborted) break;
 
-              if (!result || !result.jobs || result.jobs.length === 0) {
-                break;
-              }
+            logger.info('SEARCH', `[DISCOVERY_START] provider=${provider.platform} query="${subQuery}" page=${currentPage}`);
+            const result = await provider.search(currentSearchQuery, {
+              page: currentPage,
+              limit: pageLimit,
+              signal: controller.signal,
+            });
+            pagesFetched++;
 
-              logger.info(
-                'SEARCH',
-                `[DISCOVERY_PROVIDER] provider=${provider.platform} query="${subQuery}" page=${currentPage} fetched=${result.jobs.length}`
-              );
-
-              for (const job of result.jobs) {
-                const key = job.id || job.url;
-                if (!seenIds.has(key)) {
-                  seenIds.add(key);
-                  providerJobs.push(job);
-                }
-              }
-
-              if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
-                break;
-              }
-
-              currentPage++;
+            if (!result || !result.jobs || result.jobs.length === 0) {
+              break;
             }
+
+            logger.info(
+              'SEARCH',
+              `[DISCOVERY_PROVIDER] provider=${provider.platform} query="${subQuery}" page=${currentPage} fetched=${result.jobs.length}`
+            );
+
+            for (const job of result.jobs) {
+              const key = job.id || job.url;
+              if (!seenIds.has(key)) {
+                seenIds.add(key);
+                providerJobs.push(job);
+              }
+            }
+
+            if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
+              break;
+            }
+
+            currentPage++;
           }
+        }
 
-          return providerJobs;
-        };
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Provider search request timeout (12s limit)')), 12000)
-        );
-
-        const providerJobs = await Promise.race([providerTask(), timeoutPromise]);
+        clearTimeout(timeoutId);
 
         const outcome = providerJobs.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
 
@@ -188,9 +197,11 @@ export class JobScraperEngine {
         providerBreakdown[provider.platform] = { scraped: providerJobs.length, status: outcome };
         return providerJobs;
       } catch (err: any) {
-        const errMessage = err.message || '';
+        clearTimeout(timeoutId);
+        const isTimeout = controller.signal.aborted || err.name === 'AbortError' || (err.message || '').includes('timeout') || (err.message || '').includes('12s limit');
+        const errMessage = isTimeout ? 'Provider search request timeout (12s limit)' : (err.message || 'Provider failed');
         let outcome = 'FAILED';
-        if (errMessage.includes('timeout') || errMessage.includes('12s limit')) {
+        if (isTimeout) {
           outcome = 'TIMEOUT';
         } else if (errMessage.includes('ECONN') || errMessage.includes('network')) {
           outcome = 'NETWORK_ERROR';

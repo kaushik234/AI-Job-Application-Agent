@@ -6,7 +6,7 @@
  * @architect Clean Architecture - Job Verification Service
  */
 
-import { ExternalJobVerificationResult, JobLifecycleStatus, JobListing } from '@sentinel/types';
+import { ExternalJobVerificationResult, JobLifecycleStatus, JobListing, SearchQueryRelevanceResult } from '@sentinel/types';
 import { db } from '../database';
 import { logger } from '@sentinel/shared';
 import axios from 'axios';
@@ -204,7 +204,7 @@ export class JobVerificationService {
       const httpStatus = response.status;
 
       // Run Platform-Specific Validators
-      const platformResult = this.runPlatformSpecificValidators(job, targetUrl, finalUrl, html, httpStatus, timestamp);
+      const platformResult = this.runPlatformSpecificValidators(job, targetUrl, finalUrl, html, httpStatus, timestamp, searchQuery);
       await this.updateJobRecord(job, platformResult);
       return platformResult;
     } catch (err: any) {
@@ -452,7 +452,8 @@ export class JobVerificationService {
     finalUrl: string,
     html: string,
     httpStatus: number,
-    timestamp: string
+    timestamp: string,
+    searchQuery?: string
   ): ExternalJobVerificationResult {
     const htmlLower = html.toLowerCase();
     const finalUrlLower = finalUrl.toLowerCase();
@@ -715,7 +716,7 @@ export class JobVerificationService {
     const countryMismatch = countryRes.isVerified && countryRes.country !== job.country;
 
     // Evaluate Search Query Relevance (Phase 1)
-    const searchRelevance = this.verifySearchQueryRelevance(job, undefined, detectedTitle, detectedDescription || html);
+    const searchRelevance = this.verifySearchQueryRelevance(job, searchQuery, detectedTitle, detectedDescription || html);
 
     if (!searchRelevance.searchRelevanceVerified) {
       return {
@@ -897,13 +898,7 @@ export class JobVerificationService {
     return job;
   }
 
-  /**
-   * Backwards-compatible alias for single job verification.
-   */
-  public async verifyJobListing(job: JobListing): Promise<JobListing> {
-    await this.verifyExternalJob(job);
-    return job;
-  }
+
 
   /**
    * Checks whether an application can be created for a job.
@@ -956,8 +951,9 @@ export class JobVerificationService {
   /**
    * Helper alias method for verifying a single job listing with searchQuery context.
    */
-  public async verifyJobListing(job: JobListing, searchQuery?: string): Promise<ExternalJobVerificationResult> {
-    return this.verifyExternalJob(job, searchQuery);
+  public async verifyJobListing(job: JobListing, searchQuery?: string): Promise<JobListing> {
+    await this.verifyExternalJob(job, searchQuery);
+    return job;
   }
 
   /**

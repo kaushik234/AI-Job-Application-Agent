@@ -43,9 +43,11 @@ export class AshbyProvider extends BaseJobProvider {
         await Promise.all(
           ASHBY_BOARDS.map(async (boardToken) => {
             try {
+              const signals = [AbortSignal.timeout(8000)];
+              if (pagination?.signal) signals.push(pagination.signal);
               const res = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${boardToken}`, {
                 headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.any(signals),
               });
 
               if (!res.ok) return;

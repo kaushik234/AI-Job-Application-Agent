@@ -44,9 +44,11 @@ export class LeverProvider extends BaseJobProvider {
         await Promise.all(
           LEVER_COMPANIES.map(async (companyToken) => {
             try {
+              const signals = [AbortSignal.timeout(8000)];
+              if (pagination?.signal) signals.push(pagination.signal);
               const res = await fetch(`https://api.lever.co/v0/postings/${companyToken}?mode=json`, {
                 headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.any(signals),
               });
 
               if (!res.ok) return;

@@ -7,6 +7,7 @@ import { MasterResume } from '@sentinel/types';
 
 export interface DerivedJobQueries {
   userQuery?: string;
+  primaryQueries: string[];
   resumeQueries: string[];
   keywords: string[];
   primaryRole: string;
@@ -58,6 +59,7 @@ export function calculateResumeExperienceYears(resume?: MasterResume | null): nu
  */
 export function deriveSearchQueriesFromResume(resume?: MasterResume | null, userQuery?: string): DerivedJobQueries {
   const userQueryClean = userQuery && userQuery.trim().length > 0 ? userQuery.trim() : undefined;
+  const primaryQueriesSet = new Set<string>();
   const resumeQueriesSet = new Set<string>();
 
   const totalYearsExperience = calculateResumeExperienceYears(resume);
@@ -76,6 +78,7 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     const recentRole = resume.experience[0].role;
     if (recentRole && recentRole.trim().length > 0) {
       primaryRole = recentRole.trim();
+      primaryQueriesSet.add(primaryRole);
       resumeQueriesSet.add(primaryRole);
     }
   }
@@ -90,57 +93,71 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
 
   const skillsLower = allSkills.map((s) => s.toLowerCase());
 
-  // 2. Specific tech role derivations
+  // 2. High-value primary role derivations
   const isFlutter = skillsLower.some((s) => s.includes('flutter') || s.includes('dart'));
   const isReact = skillsLower.some((s) => s.includes('react') || s.includes('vue') || s.includes('angular') || s.includes('next'));
   const isBackend = skillsLower.some((s) => s.includes('node') || s.includes('python') || s.includes('java') || s.includes('go') || s.includes('express'));
   const isDevOps = skillsLower.some((s) => s.includes('aws') || s.includes('docker') || s.includes('kubernetes') || s.includes('devops') || s.includes('terraform'));
 
   if (isFlutter) {
+    primaryQueriesSet.add('Flutter Developer');
+    primaryQueriesSet.add('Flutter Engineer');
+    primaryQueriesSet.add('Mobile Developer');
+    primaryQueriesSet.add('Mobile Engineer');
+    primaryQueriesSet.add('Software Engineer - Mobile');
+
+    resumeQueriesSet.add('Flutter Developer');
+    resumeQueriesSet.add('Flutter Engineer');
+    resumeQueriesSet.add('Mobile Developer');
+    resumeQueriesSet.add('Mobile Engineer');
+    resumeQueriesSet.add('Software Engineer - Mobile');
     if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
       resumeQueriesSet.add('Senior Flutter Developer');
       resumeQueriesSet.add('Senior Flutter Engineer');
       resumeQueriesSet.add('Lead Mobile Engineer');
     }
-    resumeQueriesSet.add('Flutter Developer');
-    resumeQueriesSet.add('Flutter Engineer');
-    resumeQueriesSet.add('Mobile Developer');
-    resumeQueriesSet.add('Mobile Application Developer');
-    resumeQueriesSet.add('Mobile Software Engineer');
-    resumeQueriesSet.add('Mobile Engineer');
     resumeQueriesSet.add('Cross Platform Developer');
     resumeQueriesSet.add('Dart Developer');
-    resumeQueriesSet.add('Software Engineer - Mobile');
   }
 
   if (isReact) {
+    primaryQueriesSet.add('Frontend Engineer');
+    primaryQueriesSet.add('Frontend Developer');
+    primaryQueriesSet.add('Full Stack Engineer');
+    primaryQueriesSet.add('React Developer');
+
+    resumeQueriesSet.add('Frontend Engineer');
+    resumeQueriesSet.add('Frontend Developer');
+    resumeQueriesSet.add('Full Stack Engineer');
+    resumeQueriesSet.add('React Developer');
     if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
       resumeQueriesSet.add('Senior Frontend Engineer');
       resumeQueriesSet.add('Senior Full Stack Engineer');
     }
-    resumeQueriesSet.add('Frontend Engineer');
-    resumeQueriesSet.add('Frontend Developer');
-    resumeQueriesSet.add('Full Stack Engineer');
-    resumeQueriesSet.add('Full Stack Developer');
-    resumeQueriesSet.add('React Developer');
   }
 
   if (isBackend) {
-    if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
-      resumeQueriesSet.add('Senior Backend Engineer');
-    }
+    primaryQueriesSet.add('Backend Engineer');
+    primaryQueriesSet.add('Software Engineer');
+
     resumeQueriesSet.add('Backend Engineer');
     resumeQueriesSet.add('Software Engineer');
     resumeQueriesSet.add('Node.js Developer');
+    if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
+      resumeQueriesSet.add('Senior Backend Engineer');
+    }
   }
 
   if (isDevOps) {
+    primaryQueriesSet.add('DevOps Engineer');
+    primaryQueriesSet.add('Cloud Engineer');
+
     resumeQueriesSet.add('DevOps Engineer');
     resumeQueriesSet.add('Cloud Engineer');
     resumeQueriesSet.add('Infrastructure Engineer');
   }
 
-  // 3. Dynamic Candidate-Aware Startup & Small Company Search Variations (Phases 14 & 15)
+  // Secondary/expansion variations (not in primaryQueries)
   if (isFlutter) {
     resumeQueriesSet.add('Flutter Developer startup');
     resumeQueriesSet.add('Flutter Engineer startup');
@@ -156,37 +173,25 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     resumeQueriesSet.add('Node.js Developer startup');
     resumeQueriesSet.add('Backend Engineer SaaS');
     resumeQueriesSet.add('Backend Engineer scale-up');
-  } else {
-    resumeQueriesSet.add(`${primaryRole} startup`);
-    resumeQueriesSet.add(`${primaryRole} SaaS`);
-    resumeQueriesSet.add(`${primaryRole} scale-up`);
   }
 
-  // Fallback to top skills
-  for (const skill of allSkills.slice(0, 3)) {
-    if (skill.length > 2) {
-      resumeQueriesSet.add(`${skill} Developer`);
-    }
+  const primaryQueries = Array.from(primaryQueriesSet).slice(0, 5);
+  if (primaryQueries.length === 0) {
+    primaryQueries.push('Software Engineer', 'Developer');
   }
 
   const resumeQueries = Array.from(resumeQueriesSet).slice(0, 25);
-  if (resumeQueries.length === 0) {
-    resumeQueries.push('Software Engineer', 'Developer', 'Software Engineer startup');
-  }
 
-  // If explicit user search query is specified, effective search MUST be the user query.
   let effectiveKeywords: string[];
   if (userQueryClean) {
     effectiveKeywords = [userQueryClean];
   } else {
     effectiveKeywords = [...resumeQueries];
-    if (!effectiveKeywords.some((k) => k.toLowerCase().includes('software engineer') || k.toLowerCase().includes('developer'))) {
-      effectiveKeywords.push('Software Engineer', 'Developer');
-    }
   }
 
   return {
     userQuery: userQueryClean,
+    primaryQueries,
     resumeQueries,
     keywords: effectiveKeywords,
     primaryRole,
