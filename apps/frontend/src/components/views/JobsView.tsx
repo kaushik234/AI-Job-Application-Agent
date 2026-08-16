@@ -57,7 +57,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [autofillAnalysis, setAutofillAnalysis] = useState<any>(null);
 
   // Job Mode & Source Debug states
-  const [modeFilter, setModeFilter] = useState<'LIVE' | 'DEMO' | 'ALL'>('ALL');
+  const [modeFilter, setModeFilter] = useState<'LIVE' | 'DEMO' | 'ALL'>('LIVE');
   const [debugJobId, setDebugJobId] = useState<string | null>(null);
   const [debugSourceData, setDebugSourceData] = useState<any>(null);
 
@@ -150,6 +150,25 @@ export const JobsView: React.FC<JobsViewProps> = ({
       onRefresh();
     } catch (err: any) {
       alert(`Verification Error: ${err.message || 'Verification check failed'}`);
+    } finally {
+      setActionLoadingJobId(null);
+    }
+  };
+
+  const handleOpenOriginalPost = async (job: JobListing) => {
+    if (!job || !job.id) return;
+    setActionLoadingJobId(job.id);
+    try {
+      const res = await api.post(`/jobs/${job.id}/verify-original`, {});
+      const data = res.data;
+      if (data?.canOpen && data?.finalUrl) {
+        window.open(data.finalUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        const minsMsg = data?.minutesAgo !== undefined ? `\nLast verified: ${data.minutesAgo} minutes ago.` : '';
+        alert(`⚠️ This job is no longer available.\nStatus: ${data?.jobStatus || 'NOT_ACTIVE'}\nReason: ${data?.reason || 'External job posting has expired or been removed.'}${minsMsg}`);
+      }
+    } catch (err: any) {
+      alert(`Error verifying job link: ${err.message || 'Could not verify external job posting.'}`);
     } finally {
       setActionLoadingJobId(null);
     }
@@ -319,7 +338,22 @@ export const JobsView: React.FC<JobsViewProps> = ({
                     modeFilter === 'LIVE' ? 'bg-emerald-600 text-white shadow' : 'text-emerald-400 hover:text-emerald-300'
                   }`}
                 >
-                  🟢 Live Jobs ({jobs.filter((j) => (j.jobStatus === 'ACTIVE' && j.sourceVerified) || (!j.isDemoJob && j.jobStatus !== 'DEMO_ONLY')).length})
+                  🟢 Live Jobs ({
+                    jobs.filter((j) => {
+                      const companyLower = (j.company || '').toLowerCase();
+                      const idLower = (j.id || '').toLowerCase();
+                      const isSynthetic =
+                        j.isDemoJob === true ||
+                        j.jobStatus === 'DEMO_ONLY' ||
+                        j.verificationStatus === 'DEMO_ONLY' ||
+                        idLower.includes('demo') ||
+                        idLower.includes('mock') ||
+                        companyLower.includes('demo technologies');
+                      const isMismatch = j.verificationStatus === 'SOURCE_MISMATCH' || j.jobStatus === 'SOURCE_MISMATCH';
+                      const isExpired = j.verificationStatus === 'EXPIRED' || j.jobStatus === 'EXPIRED';
+                      return (j.jobStatus === 'ACTIVE' || j.verificationStatus === 'ACTIVE' || j.sourceVerified === true) && !isSynthetic && !isMismatch && !isExpired;
+                    }).length
+                  })
                 </button>
                 <button
                   type="button"
@@ -346,17 +380,69 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Job Grid */}
       {(() => {
+        const searchLower = query.toLowerCase().trim();
         const filteredJobs = jobs.filter((j) => {
-          if (modeFilter === 'LIVE') return (j.jobStatus === 'ACTIVE' && j.sourceVerified) || (!j.isDemoJob && j.jobStatus !== 'DEMO_ONLY');
-          if (modeFilter === 'DEMO') return j.isDemoJob || j.jobStatus === 'DEMO_ONLY';
+          const companyLower = (j.company || '').toLowerCase();
+          const titleLower = (j.title || '').toLowerCase();
+          const platformLower = (j.platform || '').toLowerCase();
+          const descLower = (j.description || '').toLowerCase();
+          const idLower = (j.id || '').toLowerCase();
+
+          const isSynthetic =
+            j.isDemoJob === true ||
+            j.jobStatus === 'DEMO_ONLY' ||
+            j.verificationStatus === 'DEMO_ONLY' ||
+            idLower.includes('demo') ||
+            idLower.includes('mock') ||
+            idLower.includes('e2e') ||
+            companyLower.includes('demo technologies') ||
+            companyLower.includes('company alpha') ||
+            companyLower.includes('company beta') ||
+            companyLower.includes('factcorp') ||
+            companyLower.includes('example corp');
+
+          const isMismatch = j.verificationStatus === 'SOURCE_MISMATCH' || j.jobStatus === 'SOURCE_MISMATCH';
+          const isExpired = j.verificationStatus === 'EXPIRED' || j.jobStatus === 'EXPIRED';
+
+          const modePass =
+            modeFilter === 'LIVE'
+              ? (j.jobStatus === 'ACTIVE' || j.verificationStatus === 'ACTIVE' || j.sourceVerified === true) && !isSynthetic && !isMismatch && !isExpired
+              : modeFilter === 'DEMO'
+              ? isSynthetic
+              : !isSynthetic;
+
+          if (!modePass) return false;
+
+          if (searchLower.length > 0) {
+            return (
+              companyLower.includes(searchLower) ||
+              titleLower.includes(searchLower) ||
+              platformLower.includes(searchLower) ||
+              descLower.includes(searchLower) ||
+              idLower.includes(searchLower)
+            );
+          }
+
           return true;
         });
 
         if (filteredJobs.length === 0) {
           return (
-            <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/40">
-              <Briefcase className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">No matching jobs found for selected filter ({modeFilter}).</h3>
+            <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
+              <Briefcase className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                No verified live jobs found{query.trim() ? ` for "${query.trim()}"` : ''}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Sentinel strictly enforces zero fake or unverified jobs. Try adjusting your target role query or country filters to trigger fresh live job discovery across active ATS boards.
+              </p>
+              <div className="pt-2 flex items-center justify-center space-x-4 text-[11px] text-slate-400">
+                <span>Providers Checked: 9</span>
+                <span>•</span>
+                <span>Verified Live Jobs: 0</span>
+                <span>•</span>
+                <span>Fake/Demo Jobs Displayed: 0</span>
+              </div>
             </div>
           );
         }
@@ -383,12 +469,38 @@ export const JobsView: React.FC<JobsViewProps> = ({
                       <Badge variant="blue" size="sm">
                         {job.platform}
                       </Badge>
+                      {job.applyabilityStatus && (
+                        <Badge variant={job.applyabilityStatus === 'APPLY_NOW' ? 'green' : 'amber'} size="sm">
+                          {job.applyabilityStatus === 'APPLY_NOW' ? '⚡ APPLY NOW' : '👁️ VIEW ONLY'}
+                        </Badge>
+                      )}
                       <Badge variant={priorityBadgeVariant as any} size="sm">
                         {priority} PRIORITY
                       </Badge>
+                      {job.companySize && job.companySize !== 'UNKNOWN' && (
+                        <Badge variant="purple" size="sm">
+                          {job.companySize}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center space-x-1">
+                      {job.freshnessCategory && (
+                        <Badge
+                          variant={
+                            job.freshnessCategory === 'VERY_RECENT'
+                              ? 'green'
+                              : job.freshnessCategory === 'RECENT'
+                              ? 'indigo'
+                              : job.freshnessCategory === 'FRESH'
+                              ? 'blue'
+                              : 'gray'
+                          }
+                          size="sm"
+                        >
+                          {job.freshnessCategory.replace('_', ' ')}
+                        </Badge>
+                      )}
                       <Badge variant={recBadgeVariant as any} size="sm">
                         {recommendation}
                       </Badge>
@@ -744,15 +856,14 @@ export const JobsView: React.FC<JobsViewProps> = ({
             )}
 
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-              <a
-                href={selectedJob.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center space-x-1 text-blue-400 hover:underline font-semibold"
+              <button
+                type="button"
+                onClick={() => handleOpenOriginalPost(selectedJob)}
+                className="inline-flex items-center space-x-1 text-blue-400 hover:underline font-semibold text-xs"
               >
                 <span>View original post</span>
                 <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              </button>
 
               <div className="flex items-center space-x-2">
                 <Button

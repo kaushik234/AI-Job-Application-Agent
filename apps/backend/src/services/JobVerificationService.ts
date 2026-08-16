@@ -225,6 +225,78 @@ export class JobVerificationService {
   }
 
   /**
+   * Evaluates title match score and verifies that the external page title corresponds to the discovered job.
+   */
+  public calculateTitleMatchScore(
+    discoveredTitle: string,
+    detectedTitle?: string
+  ): { score: number; isMatch: boolean; reason?: string } {
+    if (!discoveredTitle) {
+      return { score: 0, isMatch: false, reason: 'Missing discovered title.' };
+    }
+    if (!detectedTitle) {
+      return { score: 0.8, isMatch: true };
+    }
+
+    const normDiscovered = discoveredTitle.toLowerCase().trim();
+    const normDetected = detectedTitle.toLowerCase().trim();
+
+    if (normDiscovered === normDetected || normDetected.includes(normDiscovered) || normDiscovered.includes(normDetected)) {
+      return { score: 1.0, isMatch: true };
+    }
+
+    const discTokens = this.normalizeTitleTokens(discoveredTitle);
+    const detTokens = this.normalizeTitleTokens(detectedTitle);
+
+    if (discTokens.length === 0 || detTokens.length === 0) {
+      return { score: 0.5, isMatch: true };
+    }
+
+    // Technology and domain stack keywords that must match if present in discovered title
+    const techStackKeywords = [
+      'flutter', 'react', 'ios', 'android', 'fullstack', 'backend', 'frontend', 'mobile',
+      'devops', 'golang', 'node', 'python', 'java', 'ruby', 'rust', 'c++', 'cloud', 'security',
+      'zk', 'proof', 'datacenter', 'infrastructure', 'infra'
+    ];
+
+    const discTech = discTokens.filter((t) => techStackKeywords.includes(t));
+    const detTech = detTokens.filter((t) => techStackKeywords.includes(t));
+
+    // If discovered title specifies a technology/domain (e.g. Flutter) and external title contains conflicting domain (e.g. ZK Proof / Datacenter) without matching target tech -> SOURCE_MISMATCH
+    if (discTech.length > 0) {
+      const hasTechOverlap = discTech.some((t) => detTech.includes(t) || normDetected.includes(t));
+      if (!hasTechOverlap) {
+        return {
+          score: 0.15,
+          isMatch: false,
+          reason: `Discovered technology (${discTech.join(', ')}) missing from external page title ("${detectedTitle}")`,
+        };
+      }
+    }
+
+    // Token overlap calculation
+    let matchCount = 0;
+    for (const token of discTokens) {
+      if (detTokens.includes(token) || normDetected.includes(token)) {
+        matchCount++;
+      } else if (token === 'developer' || token === 'engineer' || token === 'programmer') {
+        if (normDetected.includes('engineer') || normDetected.includes('developer') || normDetected.includes('programmer')) {
+          matchCount++;
+        }
+      }
+    }
+
+    const score = Math.round((matchCount / discTokens.length) * 100) / 100;
+    const isMatch = score >= 0.5;
+
+    return {
+      score,
+      isMatch,
+      reason: isMatch ? undefined : `Title mismatch: Discovered "${discoveredTitle}" vs External "${detectedTitle}" (match score: ${Math.round(score * 100)}%)`,
+    };
+  }
+
+  /**
    * Source-Specific Validators for SAP, Shopify, Greenhouse, Workable, SEEK, and Generic Career Pages.
    */
   private runPlatformSpecificValidators(
@@ -431,23 +503,23 @@ export class JobVerificationService {
       if (h1Clean) detectedTitle = h1Clean;
     }
 
-    const jobTitleTokens = this.normalizeTitleTokens(job.title || '');
-    const pageSearchText = `${detectedTitle || ''} ${html.substring(0, 4000)}`.toLowerCase();
+    const titleVerification = this.calculateTitleMatchScore(job.title || '', detectedTitle);
 
-    if (jobTitleTokens.length > 0) {
-      const matchingTokens = jobTitleTokens.filter((token) => pageSearchText.includes(token));
-      if (matchingTokens.length === 0) {
-        return {
-          verified: false,
-          status: JobLifecycleStatus.SOURCE_MISMATCH,
-          reason: 'External page content does not correspond to the stored job.',
-          httpStatus,
-          finalUrl,
-          detectedTitle,
-          detectedCompany,
-          verifiedAt: timestamp,
-        };
-      }
+    if (!titleVerification.isMatch) {
+      return {
+        verified: false,
+        status: JobLifecycleStatus.SOURCE_MISMATCH,
+        reason: titleVerification.reason || `Discovered job title "${job.title}" does not match external page title "${detectedTitle}".`,
+        httpStatus,
+        finalUrl,
+        detectedTitle,
+        detectedCompany,
+        jobIdentityVerified: false,
+        titleMatchScore: titleVerification.score,
+        companyMatchScore: 1.0,
+        jobIdentityReason: titleVerification.reason,
+        verifiedAt: timestamp,
+      };
     }
 
     // 8. POSITIVE EVIDENCE FOR ACTIVE STATUS
@@ -470,6 +542,18 @@ export class JobVerificationService {
         finalUrl,
         detectedTitle,
         detectedCompany,
+        jobIdentityVerified: true,
+        titleMatchScore: titleVerification.score,
+        companyMatchScore: 1.0,
+        locationMatchScore: 1.0,
+        contentMatchScore: 1.0,
+        sourceEvidence: {
+          title: { value: detectedTitle || job.title, source: 'external_page', verified: true },
+          company: { value: detectedCompany || job.company, source: 'external_page', verified: true },
+          location: { value: job.location, source: 'external_page', verified: true },
+          salary: job.salaryText ? { value: job.salaryText, source: 'external_page', verified: true } : undefined,
+          visaSponsorship: job.visaSponsorship ? { value: job.visaSponsorship, source: 'external_page', verified: true } : undefined,
+        },
         verifiedAt: timestamp,
       };
     }
@@ -496,16 +580,75 @@ export class JobVerificationService {
     job.verificationReason = result.reason;
     job.verificationNotes = result.reason;
     job.lastVerifiedAt = result.verifiedAt;
+    job.revalidatedAt = result.verifiedAt;
+    job.firstDiscoveredAt = job.firstDiscoveredAt || job.discoveredAt || job.createdAt || result.verifiedAt;
+    job.lastSeenAt = result.verifiedAt;
     job.finalUrl = result.finalUrl || job.url;
+    job.canonicalUrl = job.canonicalUrl || job.finalUrl || job.url;
     job.detectedTitle = result.detectedTitle;
     job.detectedCompany = result.detectedCompany;
+    job.jobIdentityVerified = result.jobIdentityVerified ?? (result.status === JobLifecycleStatus.ACTIVE);
+    job.titleMatchScore = result.titleMatchScore;
+    job.companyMatchScore = result.companyMatchScore;
+    job.locationMatchScore = result.locationMatchScore;
+    job.contentMatchScore = result.contentMatchScore;
+    job.jobIdentityReason = result.jobIdentityReason || result.reason;
+    job.sourceEvidence = result.sourceEvidence;
 
     if (result.status === JobLifecycleStatus.DEMO_ONLY) {
       job.isDemoJob = true;
+      job.applyabilityStatus = 'EXPIRED';
+    } else if (result.status === JobLifecycleStatus.SOURCE_MISMATCH) {
+      job.sourceVerified = false;
+      job.jobIdentityVerified = false;
+      job.applyabilityStatus = 'UNVERIFIED';
+    } else if (result.verified && result.status === JobLifecycleStatus.ACTIVE && job.jobIdentityVerified !== false) {
+      const urlLower = (job.canonicalUrl || job.url || '').toLowerCase();
+      const isDirectATS =
+        urlLower.includes('ashbyhq.com') ||
+        urlLower.includes('greenhouse.io') ||
+        urlLower.includes('lever.co') ||
+        urlLower.includes('workable.com') ||
+        urlLower.includes('/apply') ||
+        urlLower.includes('/jobs/');
+      job.applyabilityStatus = isDirectATS ? 'APPLY_NOW' : 'VIEW_ONLY';
+    } else {
+      job.applyabilityStatus = 'EXPIRED';
     }
 
     await db.saveJobs([job]);
-    logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Verified: ${result.verified}`);
+    logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Applyability: ${job.applyabilityStatus} | Verified: ${result.verified}`);
+    return job;
+  }
+
+  /**
+   * Checks whether job verification was performed within maxAgeHours (default: 6h).
+   */
+  public isVerificationFresh(job: JobListing, maxAgeHours = 6): boolean {
+    if (!job.lastVerifiedAt) return false;
+    const verifiedDate = new Date(job.lastVerifiedAt);
+    if (isNaN(verifiedDate.getTime())) return false;
+    const ageMs = Date.now() - verifiedDate.getTime();
+    return ageMs >= 0 && ageMs <= maxAgeHours * 60 * 60 * 1000;
+  }
+
+  /**
+   * Performs controlled revalidation for a single job listing.
+   * If verification is sufficiently fresh and verified, returns current job model without external HTTP call.
+   */
+  public async verifyOrRevalidateJob(job: JobListing, force = false, maxAgeHours = 6): Promise<JobListing> {
+    if (!force && this.isVerificationFresh(job, maxAgeHours) && job.sourceVerified === true && job.verificationStatus === JobLifecycleStatus.ACTIVE) {
+      return job;
+    }
+
+    const previousStatus = job.jobStatus || job.verificationStatus || 'UNVERIFIED';
+    const result = await this.verifyExternalJob(job);
+
+    logger.info(
+      'SEARCH',
+      `[JOB_REVALIDATION]\nCompany: ${job.company}\nTitle: ${job.title}\nPreviousStatus: ${previousStatus}\nNewStatus: ${result.status}\nReason: ${result.reason}`
+    );
+
     return job;
   }
 

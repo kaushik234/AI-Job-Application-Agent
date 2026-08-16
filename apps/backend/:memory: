@@ -1,0 +1,241 @@
+{
+  "jobs": [
+    {
+      "id": "unverified-1",
+      "platform": "Seek",
+      "company": "Unknown Firm",
+      "title": "Flutter Engineer",
+      "location": "Sydney",
+      "country": "AU",
+      "url": "https://www.seek.com.au/job/88888",
+      "visaSponsorship": true,
+      "isRemote": true,
+      "postedDate": "2026-08-11",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "sourceVerified": false,
+      "jobStatus": "DISCOVERED",
+      "verificationStatus": "DISCOVERED"
+    },
+    {
+      "id": "company-beta-1",
+      "platform": "Lever",
+      "company": "Company Beta",
+      "title": "Android Developer",
+      "location": "Sydney",
+      "country": "AU",
+      "url": "https://jobs.lever.co/companybeta/1",
+      "visaSponsorship": true,
+      "isRemote": true,
+      "postedDate": "2026-08-11",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "isDemoJob": true,
+      "jobStatus": "DEMO_ONLY",
+      "sourceVerified": false
+    },
+    {
+      "id": "demo-tech-1",
+      "platform": "Ashby",
+      "company": "Demo Technologies",
+      "title": "Senior Flutter Developer",
+      "location": "Sydney",
+      "country": "AU",
+      "url": "https://jobs.ashbyhq.com/demo/1",
+      "visaSponsorship": true,
+      "isRemote": true,
+      "postedDate": "2026-08-11",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "isDemoJob": true,
+      "jobStatus": "DEMO_ONLY",
+      "verificationStatus": "DEMO_ONLY",
+      "sourceVerified": false
+    },
+    {
+      "id": "real-active-1",
+      "platform": "Greenhouse",
+      "company": "Canva",
+      "title": "Senior Software Engineer",
+      "location": "Sydney",
+      "country": "AU",
+      "url": "https://boards.greenhouse.io/canva/jobs/1",
+      "originalUrl": "https://boards.greenhouse.io/canva/jobs/1",
+      "visaSponsorship": true,
+      "isRemote": true,
+      "postedDate": "2026-08-12",
+      "createdAt": "2026-08-12T00:00:00.000Z",
+      "sourceVerified": true,
+      "jobStatus": "ACTIVE",
+      "verificationStatus": "ACTIVE"
+    }
+  ],
+  "matches": [],
+  "masterResume": {
+    "fullName": "Kaushik Khandala",
+    "email": "kaushikkhandalakaushik234@gmail.com",
+    "phone": "+91 8849170743",
+    "location": "Ahmedabad, India",
+    "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+    "github": "https://github.com/kaushikkhandala",
+    "portfolio": "https://kaushikkhandala.dev",
+    "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+    "explicitExperienceYears": 3.8,
+    "experienceSource": "RESUME_EXPLICIT",
+    "skills": {
+      "languages": [
+        "Dart"
+      ],
+      "frameworks": [
+        "Flutter",
+        "BLoC"
+      ],
+      "cloudAndDevOps": [
+        "Firebase"
+      ],
+      "databases": [
+        "SQLite",
+        "Hive"
+      ],
+      "tools": [
+        "Git",
+        "Android Studio",
+        "VSCode"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Safal Infosoft",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "12/2023",
+        "endDate": "Present",
+        "highlights": [
+          "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+          "Engineered offline caching layer using SQLite and Hive local key-value databases."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite",
+          "Hive",
+          "Firebase"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "01/2023",
+        "endDate": "11/2023",
+        "highlights": [
+          "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+          "Integrated RESTful API endpoints and state management."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "REST APIs",
+          "Git"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Operations Manager",
+        "location": "Ahmedabad, India",
+        "startDate": "07/2022",
+        "endDate": "01/2023",
+        "highlights": [
+          "Managed tech team operations and contributed to Flutter application development."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "Operations"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "institution": "Sal Engineering & Technical Institute",
+        "degree": "B.E",
+        "fieldOfStudy": "Information Technology",
+        "graduationYear": "2022"
+      }
+    ],
+    "certifications": [],
+    "projects": [
+      {
+        "title": "Urmin Food and Tobacco distribution application",
+        "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite"
+        ],
+        "url": "https://github.com/kaushikkhandala/urmin-food"
+      },
+      {
+        "title": "Danatone ERP",
+        "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Hive",
+          "REST APIs"
+        ],
+        "url": "https://github.com/kaushikkhandala/danatone-erp"
+      },
+      {
+        "title": "Tent Studio",
+        "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Firebase"
+        ],
+        "url": "https://github.com/kaushikkhandala/tent-studio"
+      }
+    ]
+  },
+  "tailoredResumes": [],
+  "resumeVersions": [],
+  "coverLetters": [],
+  "coverLetterVersions": [],
+  "applications": [],
+  "emails": [],
+  "settings": {
+    "countryFilter": [
+      "AU",
+      "CA",
+      "DE"
+    ],
+    "minimumSalary": 110000,
+    "remoteOnly": false,
+    "visaRequired": true,
+    "targetKeywords": [
+      "Software Engineer",
+      "Full Stack Engineer",
+      "Backend Engineer",
+      "TypeScript",
+      "Node.js"
+    ],
+    "blacklistedCompanies": [
+      "ScamCorp",
+      "Unpaid Internships Inc"
+    ],
+    "whitelistedCompanies": [
+      "Atlassian",
+      "Canva",
+      "Shopify",
+      "SAP",
+      "Zendesk",
+      "Amazon",
+      "Google"
+    ],
+    "dailyApplicationLimit": 10,
+    "automationMode": "MANUAL_APPROVAL",
+    "schedulerFrequencyHours": 24,
+    "enableEmailMonitor": true
+  },
+  "searchHistory": []
+}

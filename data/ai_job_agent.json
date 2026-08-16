@@ -1,28 +1,6 @@
 {
   "jobs": [
     {
-      "id": "job-e2e-au-seek",
-      "internalJobId": "internal-job-e2e-au-seek",
-      "sourceJobId": "e2e-seek",
-      "platform": "Seek",
-      "company": "Canva Seek",
-      "title": "Senior Flutter Developer",
-      "location": "Sydney, Australia",
-      "country": "AU",
-      "url": "https://seek.com.au/jobs/e2e-seek",
-      "originalUrl": "https://seek.com.au/jobs/e2e-seek",
-      "visaSponsorship": true,
-      "isRemote": false,
-      "postedDate": "2026-08-11",
-      "createdAt": "2026-08-11T00:00:00.000Z",
-      "discoveredAt": "2026-08-11T00:00:00.000Z",
-      "lastVerifiedAt": "2026-08-11T17:26:01.754Z",
-      "jobStatus": "DEMO_ONLY",
-      "sourceVerified": false,
-      "isDemoJob": true,
-      "verificationNotes": "🔵 DEMO / SIMULATED JOB: Isolated from live discovery pipeline."
-    },
-    {
       "id": "seek-mismatch-99",
       "internalJobId": "internal-seek-mismatch-99",
       "sourceJobId": "mismatch-99",
@@ -40,28 +18,6 @@
       "jobStatus": "SOURCE_MISMATCH",
       "sourceVerified": false,
       "verificationNotes": "🔴 SOURCE MISMATCH: Page content does not match stored job title/company."
-    },
-    {
-      "id": "seek-invalid-redirect",
-      "internalJobId": "internal-seek-invalid-redirect",
-      "sourceJobId": "redirect-123",
-      "platform": "Seek",
-      "company": "Canva Seek",
-      "title": "Senior Flutter Developer",
-      "location": "Sydney, Australia",
-      "country": "AU",
-      "url": "https://www.seek.com.au/jobs",
-      "originalUrl": "https://www.seek.com.au/jobs",
-      "visaSponsorship": true,
-      "isRemote": false,
-      "postedDate": "2026-08-11",
-      "createdAt": "2026-08-11T00:00:00.000Z",
-      "discoveredAt": "2026-08-11T00:00:00.000Z",
-      "lastVerifiedAt": "2026-08-11T17:26:01.712Z",
-      "jobStatus": "INVALID_URL",
-      "sourceVerified": false,
-      "isDemoJob": true,
-      "verificationNotes": "🔴 INVALID URL: Job URL is missing, malformed, or points to generic search portal."
     },
     {
       "id": "expired-job-123",
@@ -100,27 +56,6 @@
       "platform": "Seek",
       "country": "AU",
       "visaSponsorship": false,
-      "isRemote": false,
-      "createdAt": "2026-08-11T00:00:00.000Z"
-    },
-    {
-      "id": "demo-senior-flutter-dev",
-      "title": "Senior Flutter Developer",
-      "company": "Demo Technologies",
-      "location": "Sydney, Australia (Hybrid)",
-      "description": "Demo Technologies is hiring a Senior Flutter Developer with Dart, BLoC, SQLite, and mobile architecture experience.",
-      "requirements": [
-        "Flutter",
-        "Dart",
-        "BLoC",
-        "SQLite"
-      ],
-      "postedDate": "2026-08-11",
-      "source": "Demo Site",
-      "url": "http://localhost:3000/demo-job-application",
-      "platform": "LinkedIn",
-      "country": "AU",
-      "visaSponsorship": true,
       "isRemote": false,
       "createdAt": "2026-08-11T00:00:00.000Z"
     },
@@ -222,96 +157,6 @@
         "Rust"
       ],
       "createdAt": "2026-08-11T10:27:45.168Z"
-    },
-    {
-      "id": "case-m-facts",
-      "platform": "Greenhouse",
-      "company": "FactCorp",
-      "title": "Flutter Developer",
-      "location": "Sydney, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "2026-08-09",
-      "url": "https://factcorp.com",
-      "description": "Flutter app dev.",
-      "requirements": [
-        "Flutter"
-      ],
-      "createdAt": "2026-08-11T15:41:05.029Z"
-    },
-    {
-      "id": "case-kl-job-b",
-      "platform": "Workable",
-      "company": "Company Beta",
-      "title": "Android Flutter Developer",
-      "location": "Melbourne, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "2026-08-09",
-      "url": "https://beta.com",
-      "description": "Android Flutter Developer.",
-      "requirements": [
-        "Flutter",
-        "Android"
-      ],
-      "createdAt": "2026-08-11T15:40:48.647Z"
-    },
-    {
-      "id": "case-kl-job-a",
-      "platform": "Greenhouse",
-      "company": "Company Alpha",
-      "title": "iOS Flutter Engineer",
-      "location": "Sydney, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "2026-08-09",
-      "url": "https://alpha.com",
-      "description": "iOS Flutter Engineer.",
-      "requirements": [
-        "Flutter",
-        "iOS"
-      ],
-      "createdAt": "2026-08-11T15:40:48.647Z"
-    },
-    {
-      "id": "case-c-job",
-      "platform": "Workable",
-      "company": "Fintech Mobile",
-      "title": "Flutter Engineer",
-      "location": "Sydney, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "2026-08-09",
-      "url": "https://example.com/c",
-      "description": "Build mobile apps.",
-      "requirements": [
-        "Flutter"
-      ],
-      "createdAt": "2026-08-11T15:40:44.739Z"
-    },
-    {
-      "id": "case-b-job",
-      "platform": "Lever",
-      "company": "AppCo",
-      "title": "Senior Developer",
-      "location": "Sydney, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "2026-08-09",
-      "url": "https://example.com/b",
-      "description": "Requires Kubernetes, Rust, PySpark, and Flutter.",
-      "requirements": [
-        "Kubernetes",
-        "Rust",
-        "PySpark",
-        "Flutter"
-      ],
-      "createdAt": "2026-08-11T15:40:40.442Z"
     },
     {
       "id": "manual-9-fresh-job",
@@ -515,25 +360,6 @@
         "iOS"
       ],
       "createdAt": "2026-08-11T09:58:41.226Z"
-    },
-    {
-      "id": "test-3-experience-gap",
-      "platform": "Workable",
-      "company": "Fintech Mobile",
-      "title": "Lead Flutter Developer",
-      "location": "Sydney, AU",
-      "country": "AU",
-      "visaSponsorship": true,
-      "isRemote": true,
-      "postedDate": "Today",
-      "url": "https://fintech.io/jobs/lead-flutter",
-      "description": "Must have 5+ years experience building mobile apps in Flutter.",
-      "requirements": [
-        "5+ years experience",
-        "Flutter",
-        "Dart"
-      ],
-      "createdAt": "2026-08-11T09:58:41.219Z"
     },
     {
       "id": "test-2-backend-go",

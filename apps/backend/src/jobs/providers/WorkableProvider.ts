@@ -7,8 +7,12 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
-const WORKABLE_ACCOUNTS = ['1password', 'cultureamp'];
+const WORKABLE_ACCOUNTS = [
+  '1password', 'cultureamp', 'employmenthero', 'safetyculture', 'eucalyptus',
+  'linktree', 'octopusenergy', 'graphy', 'personio', 'hopin', 'skydio'
+];
 
 export class WorkableProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Workable';
@@ -79,11 +83,21 @@ export class WorkableProvider extends BaseJobProvider {
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
           if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
+            return kw.some((k) => {
+              if (text.includes(k)) return true;
+              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
+              return tokens.length > 0 && tokens.every((t) => {
+                if (text.includes(t)) return true;
+                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
+                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
+                }
+                return false;
+              });
+            });
           }
           return (
             kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer'].some((t) => text.includes(t))
+            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
           );
         });
       }
@@ -142,7 +156,8 @@ export class WorkableProvider extends BaseJobProvider {
       url: `https://apply.workable.com/${account}/j/${raw.shortcode || 'C89210'}/`,
       description: desc,
       requirements: ['TypeScript', 'React', 'Node.js'],
-      postedDate: raw.published ? raw.published.split('T')[0] : new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.published) || '',
+      postedAt: normalizePostingDate(raw.published),
       createdAt: new Date().toISOString(),
     };
   }

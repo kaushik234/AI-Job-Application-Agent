@@ -22,13 +22,35 @@ export class JobController {
   @Post('scrape')
   @ApiOperation({ summary: 'Trigger job discovery scraper for target country' })
   async triggerScrape(@Body() dto: ScrapeJobsDto) {
-    return this.jobService.triggerScrape(dto);
+    const resObj = await this.jobService.triggerScrape(dto);
+    console.log('[SCRAPE_TRACE] [8] CONTROLLER', {
+      stage: 'CONTROLLER',
+      jobsCount: resObj.jobs?.length,
+      totalMatches: resObj.totalMatches,
+      totalScrapedRaw: resObj.report?.totalScrapedRaw,
+      providerBreakdown: resObj.report?.providerBreakdown,
+      jobIds: resObj.jobs?.map((j: any) => j.id),
+    });
+    console.log('[SCRAPE_TRACE] [9] HTTP RESPONSE', {
+      stage: 'HTTP_RESPONSE',
+      jobsCount: resObj.jobs?.length,
+      totalMatches: resObj.totalMatches,
+      totalScrapedRaw: resObj.report?.totalScrapedRaw,
+      jobIds: resObj.jobs?.map((j: any) => j.id),
+    });
+    return resObj;
   }
 
   @Post(':id/evaluate')
   @ApiOperation({ summary: 'Evaluate candidate fit and application priority for a target job' })
   async evaluateJob(@Body() body: { id?: string }) {
     return this.jobService.evaluateJobById(body?.id);
+  }
+
+  @Post(':id/verify-original')
+  @ApiOperation({ summary: 'Controlled revalidation check before opening external job link' })
+  async verifyOriginal(@Param('id') id: string) {
+    return this.jobService.verifyOriginalPost(id);
   }
 
   @Get(':id/debug-match')

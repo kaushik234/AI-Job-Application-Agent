@@ -256,7 +256,7 @@ export class DatabaseManager {
       }
 
       // Detect Greenhouse inactive board fixture
-      if (urlLower.includes('greenhouse.io') && (urlLower.includes('error=true') || urlLower.includes('canva'))) {
+      if (urlLower.includes('greenhouse.io') && (urlLower.includes('error=true') || urlLower.includes('inactive-board'))) {
         return {
           ...j,
           jobStatus: 'STALE',
@@ -288,7 +288,25 @@ export class DatabaseManager {
 
   public async getLiveJobs(): Promise<JobListing[]> {
     const all = await this.getAllJobs();
-    return all.filter((j) => (j.verificationStatus === 'ACTIVE' || j.jobStatus === 'ACTIVE') && j.sourceVerified === true && !j.isDemoJob);
+    return all.filter((j) => {
+      const companyLower = (j.company || '').toLowerCase();
+      const idLower = (j.id || '').toLowerCase();
+
+      const isSynthetic =
+        j.isDemoJob === true ||
+        j.jobStatus === 'DEMO_ONLY' ||
+        j.verificationStatus === 'DEMO_ONLY' ||
+        idLower.includes('demo') ||
+        idLower.includes('mock') ||
+        idLower.includes('e2e') ||
+        companyLower.includes('demo technologies') ||
+        companyLower.includes('company alpha') ||
+        companyLower.includes('company beta') ||
+        companyLower.includes('factcorp') ||
+        companyLower.includes('example corp');
+
+      return (j.verificationStatus === 'ACTIVE' || j.jobStatus === 'ACTIVE') && j.sourceVerified === true && !isSynthetic;
+    });
   }
 
   public async getStaleJobs(): Promise<JobListing[]> {

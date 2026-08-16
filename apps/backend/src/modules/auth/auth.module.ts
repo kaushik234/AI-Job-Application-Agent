@@ -21,7 +21,7 @@ import { DatabaseModule } from '../../database/database.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET') || 'sentinel-super-secret-jwt-key-2026',
-        signOptions: { expiresIn: '15m' },
+        signOptions: { expiresIn: '7d' },
       }),
     }),
   ],

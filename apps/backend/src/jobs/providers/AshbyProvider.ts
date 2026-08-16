@@ -7,8 +7,14 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
-const ASHBY_BOARDS = ['ramp', 'notion', 'linear', 'openai'];
+const ASHBY_BOARDS = [
+  'ramp', 'notion', 'linear', 'figma', 'vercel', 'supabase', 'retool', 'webflow',
+  'postman', 'brex', 'lattice', 'rippling', 'zapier', 'scale', 'character', 'resend',
+  'midjourney', 'pika', 'perplexity', 'mistral', 'cursor', 'replit', 'modal', 'fly',
+  'railway', 'convex', 'clerk', 'sentry', 'datadog', 'axiom', 'openai'
+];
 
 export class AshbyProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Ashby';
@@ -77,11 +83,21 @@ export class AshbyProvider extends BaseJobProvider {
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
           if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
+            return kw.some((k) => {
+              if (text.includes(k)) return true;
+              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
+              return tokens.length > 0 && tokens.every((t) => {
+                if (text.includes(t)) return true;
+                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
+                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
+                }
+                return false;
+              });
+            });
           }
           return (
             kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer'].some((t) => text.includes(t))
+            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
           );
         });
       }
@@ -140,7 +156,8 @@ export class AshbyProvider extends BaseJobProvider {
       url: raw.jobUrl || `https://jobs.ashbyhq.com/${boardToken}/${raw.id || 'e21938'}`,
       description: desc,
       requirements: ['TypeScript', 'GraphQL', 'React'],
-      postedDate: raw.publishedAt ? raw.publishedAt.split('T')[0] : new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.publishedAt) || '',
+      postedAt: normalizePostingDate(raw.publishedAt),
       createdAt: new Date().toISOString(),
     };
   }

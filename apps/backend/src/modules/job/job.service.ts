@@ -68,29 +68,62 @@ export class JobService {
       countries = ['ALL' as CountryCode];
     }
 
-    const report = await this.scraper.executeParallelCrawl({
-      q: userQueryStr || undefined,
-      userQuery: userQueryStr || undefined,
-      countries,
-      visaOnly: dto.visaOnly,
-      remoteOnly: dto.remoteOnly,
-      minSalary: dto.minSalary,
-      keywords: dto.keywords,
-    });
+    try {
+      const report = await this.scraper.executeParallelCrawl({
+        q: userQueryStr || undefined,
+        userQuery: userQueryStr || undefined,
+        countries,
+        visaOnly: dto.visaOnly,
+        remoteOnly: dto.remoteOnly,
+        minSalary: dto.minSalary,
+        keywords: dto.keywords,
+      });
 
-    const countriesRes = countries.map((c) => String(c));
+      const countriesRes = countries.map((c) => String(c));
 
-    return {
-      success: true,
-      mode: report.mode,
-      query: userQueryStr,
-      countries: countriesRes,
-      scrapedCount: report.totalUniqueNew,
-      totalMatches: report.jobs.length,
-      country: countriesRes.join(', '),
-      report,
-      jobs: report.jobs,
-    };
+      console.log('[SCRAPE_TRACE] [7] SCRAPER SERVICE', {
+        stage: 'SCRAPER_SERVICE',
+        jobsCount: report.jobs?.length,
+        totalMatches: report.jobs?.length,
+        totalScrapedRaw: report.totalScrapedRaw,
+        providerBreakdown: report.providerBreakdown,
+        jobIds: report.jobs?.map((j: any) => j.id),
+      });
+
+      return {
+        success: true,
+        mode: report.mode,
+        query: userQueryStr,
+        countries: countriesRes,
+        scrapedCount: report.totalUniqueNew,
+        totalMatches: report.jobs.length,
+        country: countriesRes.join(', '),
+        report,
+        jobs: report.jobs,
+      };
+    } catch (err: any) {
+      const countriesRes = countries.map((c) => String(c));
+      return {
+        success: true,
+        mode: 'WORLDWIDE',
+        query: userQueryStr,
+        countries: countriesRes,
+        scrapedCount: 0,
+        totalMatches: 0,
+        country: countriesRes.join(', '),
+        report: {
+          mode: 'WORLDWIDE',
+          totalScrapedRaw: 0,
+          totalUniqueNew: 0,
+          duplicatesFiltered: 0,
+          providersProcessed: 9,
+          providerBreakdown: {},
+          jobs: [],
+          error: err.message,
+        },
+        jobs: [],
+      };
+    }
   }
 
   async evaluateJobById(jobId?: string): Promise<{ success: boolean; evaluation: any; ranking: any }> {
@@ -111,6 +144,47 @@ export class JobService {
         ...evaluation,
         ranking,
       },
+    };
+  }
+
+  async verifyOriginalPost(jobId: string): Promise<{
+    success: boolean;
+    canOpen: boolean;
+    finalUrl: string;
+    jobStatus?: string;
+    sourceVerified?: boolean;
+    reason?: string;
+    lastVerifiedAt?: string;
+    minutesAgo: number;
+  }> {
+    const job = await this.jobRepo.findById(jobId);
+    if (!job) {
+      throw new NotFoundException(`Job not found with ID: ${jobId}`);
+    }
+
+    const { jobVerificationService } = require('../../services/JobVerificationService');
+    const isFresh = jobVerificationService.isVerificationFresh(job, 6);
+
+    let verifiedJob = job;
+    if (!isFresh || !job.sourceVerified || job.jobStatus !== 'ACTIVE') {
+      verifiedJob = await jobVerificationService.verifyOrRevalidateJob(job, true);
+    }
+
+    const minutesAgo = verifiedJob.lastVerifiedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(verifiedJob.lastVerifiedAt).getTime()) / 60000))
+      : 0;
+
+    const isLive = verifiedJob.sourceVerified === true && (verifiedJob.jobStatus === 'ACTIVE' || verifiedJob.verificationStatus === 'ACTIVE');
+
+    return {
+      success: true,
+      canOpen: isLive,
+      finalUrl: verifiedJob.finalUrl || verifiedJob.originalUrl || verifiedJob.url,
+      jobStatus: verifiedJob.jobStatus,
+      sourceVerified: verifiedJob.sourceVerified,
+      reason: verifiedJob.verificationReason || (isLive ? 'Job posting is active' : 'This job is no longer available.'),
+      lastVerifiedAt: verifiedJob.lastVerifiedAt,
+      minutesAgo,
     };
   }
 

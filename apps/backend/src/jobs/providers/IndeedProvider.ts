@@ -7,6 +7,7 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class IndeedProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Indeed';
@@ -35,6 +36,8 @@ export class IndeedProvider extends BaseJobProvider {
           page,
           limit,
           jobs: [],
+          outcomeStatus: 'AUTH_REQUIRED',
+          message: 'Missing INDEED_PUBLISHER_ID environment variable. Direct portal API access requires licensed publisher key.',
         };
       }
 
@@ -106,7 +109,8 @@ export class IndeedProvider extends BaseJobProvider {
       url: `https://www.indeed.com/viewjob?jk=${raw.jobkey || 'a810923'}`,
       description: raw.snippet || '',
       requirements: ['TypeScript', 'Node.js', 'AWS'],
-      postedDate: new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.formattedRelativeTime || raw.date || raw.postedDate) || '',
+      postedAt: normalizePostingDate(raw.formattedRelativeTime || raw.date || raw.postedDate),
       createdAt: new Date().toISOString(),
     };
   }

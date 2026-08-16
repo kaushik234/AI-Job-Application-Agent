@@ -138,25 +138,6 @@ export function isRoleRelevant(
 
   const searchableText = `${title} ${description} ${requirements}`;
 
-  // Roles explicitly relevant to the candidate's current profile.
-  const targetRoleTerms = [
-    'flutter',
-    'dart',
-    'mobile developer',
-    'mobile engineer',
-    'mobile application developer',
-    'mobile application engineer',
-    'mobile software engineer',
-    'mobile software developer',
-    'mobile developer',
-    'software engineer - mobile',
-    'software developer - mobile',
-    'cross platform',
-    'cross-platform',
-    'ios developer',
-    'android developer',
-  ];
-
   // Clearly unrelated job families.
   const excludedRoleTerms = [
     'account director',
@@ -189,22 +170,41 @@ export function isRoleRelevant(
     'product designer',
   ];
 
-  // Hard reject obviously unrelated roles.
-  // Hard reject obviously unrelated roles.
+  // Hard reject obviously unrelated non-engineering roles.
   if (excludedRoleTerms.some((term) => title.includes(term))) {
     return false;
   }
 
-  // Strongest signal: the actual job title.
-  if (targetRoleTerms.some((term) => title.includes(term))) {
+  // 1. Dynamic candidate skills & role keywords from resume
+  const candidateSkills = [
+    ...(resume.skills?.languages || []),
+    ...(resume.skills?.frameworks || []),
+    ...(resume.skills?.databases || []),
+    ...(resume.skills?.tools || []),
+    ...(resume.skills?.cloudAndDevOps || []),
+  ].map((s) => s.toLowerCase().trim()).filter((s) => s.length > 1);
+
+  const candidateRoles = (resume.experience || [])
+    .map((e) => (e.role || '').toLowerCase().trim())
+    .filter((r) => r.length > 0);
+
+  const isFlutterMobileCandidate = candidateSkills.some((s) => s.includes('flutter') || s.includes('dart') || s.includes('mobile'));
+
+  const targetRoleTerms: string[] = [];
+  if (isFlutterMobileCandidate) {
+    targetRoleTerms.push('flutter', 'dart', 'mobile developer', 'mobile engineer', 'mobile application', 'cross platform', 'cross-platform', 'ios', 'android');
+  }
+
+  for (const role of candidateRoles) {
+    targetRoleTerms.push(role);
+  }
+
+  // Strongest signal: job title matches candidate target terms
+  if (targetRoleTerms.some((term) => term.length > 2 && title.includes(term))) {
     return true;
   }
 
-
-  /*
-   * Generic software-development titles are allowed only when
-   * the job contains real mobile/Flutter evidence.
-   */
+  // Generic software engineering titles
   const genericSoftwareTitleTerms = [
     'software engineer',
     'software developer',
@@ -214,35 +214,19 @@ export function isRoleRelevant(
     'full-stack engineer',
     'full stack developer',
     'full-stack developer',
+    'backend engineer',
+    'frontend engineer',
   ];
 
-  const genericSoftwareTitle = genericSoftwareTitleTerms.some((term) =>
-    title.includes(term)
-  );
+  const isGenericSoftwareTitle = genericSoftwareTitleTerms.some((term) => title.includes(term));
 
-  const mobileIndicators = [
-    'flutter',
-    'dart',
-    'mobile application',
-    'mobile app',
-    'mobile development',
-    'ios',
-    'android',
-    'react native',
-    'cross-platform',
-    'cross platform',
-  ];
-
-  const hasMobileEvidence = mobileIndicators.some((term) =>
-    searchableText.includes(term)
-  );
-
-  // Only accept generic software titles if genuine mobile evidence exists in description/requirements.
-  if (genericSoftwareTitle && hasMobileEvidence) {
-    return true;
+  if (isGenericSoftwareTitle) {
+    const hasSkillMatch = candidateSkills.some((skill) => searchableText.includes(skill));
+    if (hasSkillMatch || candidateSkills.length === 0) {
+      return true;
+    }
   }
 
-  // Everything else is not relevant to the current Flutter/mobile target.
   return false;
 }
 

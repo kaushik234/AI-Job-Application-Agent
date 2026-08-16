@@ -155,13 +155,16 @@ const MainAppContent: React.FC = () => {
 
       console.log('[JOB_UI] API response jobs:', jobsData.length);
 
-      setJobs(() => {
-        console.log('[JOB_UI] Rendering jobs:', jobsData.length);
-        return jobsData;
-      });
+      if (jobsData.length > 0) {
+        setJobs(jobsData);
+      } else {
+        console.log('[JOB_UI] Fresh scrape returned 0 jobs — preserving previously verified live jobs from database');
+        await fetchAllData();
+      }
     } catch (err) {
       console.error('Job scrape and match failed:', err);
       isLiveScrapeActiveRef.current = false;
+      await fetchAllData();
     } finally {
       setIsSearching(false);
     }

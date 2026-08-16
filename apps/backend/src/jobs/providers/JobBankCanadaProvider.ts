@@ -8,6 +8,7 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class JobBankCanadaProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Job Bank Canada';
@@ -129,7 +130,8 @@ export class JobBankCanadaProvider extends BaseJobProvider {
       url: raw.url || `https://www.jobbank.gc.ca/jobsearch/jobposting/${raw.jobPostingId}`,
       description: desc,
       requirements: reqs,
-      postedDate: raw.datePosted || new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.datePosted) || '',
+      postedAt: normalizePostingDate(raw.datePosted),
       createdAt: new Date().toISOString(),
     };
   }

@@ -301,6 +301,21 @@ export enum JobLifecycleStatus {
   DEMO_ONLY = 'DEMO_ONLY'
 }
 
+export interface FieldSourceEvidence {
+  value?: any;
+  source: string;
+  verified: boolean;
+}
+
+export interface JobSourceEvidenceMap {
+  title?: FieldSourceEvidence;
+  company?: FieldSourceEvidence;
+  location?: FieldSourceEvidence;
+  salary?: FieldSourceEvidence;
+  visaSponsorship?: FieldSourceEvidence;
+  postedDate?: FieldSourceEvidence;
+}
+
 export interface ExternalJobVerificationResult {
   verified: boolean;
   status: JobLifecycleStatus;
@@ -309,8 +324,20 @@ export interface ExternalJobVerificationResult {
   finalUrl?: string;
   detectedTitle?: string;
   detectedCompany?: string;
+  detectedLocation?: string;
+  jobIdentityVerified?: boolean;
+  titleMatchScore?: number;
+  companyMatchScore?: number;
+  locationMatchScore?: number;
+  contentMatchScore?: number;
+  jobIdentityReason?: string;
+  sourceEvidence?: JobSourceEvidenceMap;
   verifiedAt: string;
 }
+
+export type FreshnessCategory = 'VERY_RECENT' | 'RECENT' | 'FRESH' | 'STALE' | 'UNKNOWN';
+export type ApplyabilityStatus = 'APPLY_NOW' | 'VIEW_ONLY' | 'UNVERIFIED' | 'EXPIRED';
+export type SourceConfidenceLevel = 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 /** Job Listing Data Model */
 export interface JobListing {
@@ -331,20 +358,33 @@ export interface JobListing {
   isRemote: boolean;
   isHybrid?: boolean;
   url: string;
+  canonicalUrl?: string;
   originalUrl?: string;
   finalUrl?: string;
   description?: string;
   requirements?: string[];
   postedDate: string;
+  postedAt?: string | null;
+  freshnessCategory?: FreshnessCategory;
   createdAt: string;
   scrapedAt?: string;
   discoveredAt?: string;
+  firstDiscoveredAt?: string;
+  lastSeenAt?: string;
   lastVerifiedAt?: string;
+  revalidatedAt?: string;
   jobStatus?: JobLifecycleStatus | string;
   verificationStatus?: JobLifecycleStatus | string;
   sourceVerified?: boolean;
   verificationReason?: string;
   verificationNotes?: string;
+  jobIdentityVerified?: boolean;
+  titleMatchScore?: number;
+  companyMatchScore?: number;
+  locationMatchScore?: number;
+  contentMatchScore?: number;
+  jobIdentityReason?: string;
+  sourceEvidence?: JobSourceEvidenceMap;
   detectedTitle?: string;
   detectedCompany?: string;
   isDemoJob?: boolean;
@@ -355,7 +395,10 @@ export interface JobListing {
   ranking?: JobRankingResult;
   evaluation?: JobEvaluationResult;
   source?: string;
+  sources?: string[];
   sourcePlatforms?: string[];
+  sourceConfidence?: SourceConfidenceLevel;
+  applyabilityStatus?: ApplyabilityStatus;
   companySize?: CompanySizeCategory;
   companyType?: CompanyType;
   opportunityFitScore?: number;

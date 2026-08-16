@@ -25,6 +25,7 @@ import { jobProfileExtractor } from './JobProfileExtractor';
 import { applicationDecisionEngine } from './ApplicationDecisionEngine';
 import { companyClassificationService } from './CompanyClassificationService';
 import { logger } from '@sentinel/shared';
+import { classifyFreshnessCategory } from '../jobs/utils/dateNormalizer';
 import crypto from 'crypto';
 
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = {
@@ -339,12 +340,15 @@ export class JobRankingService {
         }
       );
 
-      return {
+      const freshnessCat = classifyFreshnessCategory(job.postedDate || job.postedAt);
+
+      const enrichedJob: JobListing = {
         ...job,
         matchScore: ranking.matchScore,
         applicationPriority: ranking.applicationPriority,
         recommendation: decision.recommendation as any,
         visaStatus: ranking.visaStatus,
+        freshnessCategory: freshnessCat,
         companySize: decision.companyOpportunity.companySize,
         companyType: decision.companyOpportunity.companyType,
         opportunityFitScore: decision.companyOpportunity.opportunityFitScore,
@@ -374,18 +378,39 @@ export class JobRankingService {
           ranking,
         } as JobEvaluationResult,
       };
+
+      // Diagnostic FRESHNESS log per job
+      logger.info(
+        'SEARCH',
+        `[FRESHNESS]\nCompany: ${job.company}\nTitle: ${job.title}\nPosted: ${job.postedDate || job.postedAt || 'UNSTATED'}\nFreshness: ${freshnessCat}\nVerification: ${job.jobStatus || job.verificationStatus || 'DISCOVERED'}`
+      );
+
+      return enrichedJob;
     });
 
-    // Sort by applicationPriorityScore + opportunityFitScore blend
+    const freshnessWeight = (cat?: string) => {
+      switch (cat) {
+        case 'VERY_RECENT': return 5;
+        case 'RECENT': return 4;
+        case 'FRESH': return 3;
+        case 'STALE': return 2;
+        default: return 1; // UNKNOWN
+      }
+    };
+
+    // Sort by Freshness Category Tier first, then by match score blend
     const sorted = rankedJobs.sort((a, b) => {
+      const freshDiff = freshnessWeight(b.freshnessCategory) - freshnessWeight(a.freshnessCategory);
+      if (freshDiff !== 0) return freshDiff;
+
       const scoreA = (a.applicationPriorityScore || 0) * 0.7 + (a.opportunityFitScore || 0) * 0.3;
       const scoreB = (b.applicationPriorityScore || 0) * 0.7 + (b.opportunityFitScore || 0) * 0.3;
       return scoreB - scoreA;
     });
 
-    // Diversified company size interleaving (prevents enterprise companies from taking up all top 10 slots)
+    // Employer Diversity Interleaving (prevents large/enterprise companies from dominating)
     const smallOrMedium = sorted.filter((j) => j.companySize === 'SMALL' || j.companySize === 'MICRO' || j.companySize === 'MEDIUM' || j.companyType === 'Startup');
-    const scaleupOrEnterprise = sorted.filter((j) => j.companySize === 'SCALEUP' || j.companySize === 'LARGE' || j.companySize === 'ENTERPRISE' || j.companySize === 'UNKNOWN');
+    const scaleupOrEnterprise = sorted.filter((j) => !smallOrMedium.includes(j));
 
     const diversified: JobListing[] = [];
     let i = 0, j = 0;
@@ -394,7 +419,25 @@ export class JobRankingService {
       if (j < scaleupOrEnterprise.length) diversified.push(scaleupOrEnterprise[j++]);
     }
 
-    return diversified.length > 0 ? diversified : sorted;
+    const finalJobs = diversified.length > 0 ? diversified : sorted;
+
+    // Diagnostic JOB_DIVERSITY log
+    const sizeCounts = {
+      startup: finalJobs.filter((j) => j.companyType === 'Startup' || j.companySize === 'MICRO').length,
+      small: finalJobs.filter((j) => j.companySize === 'SMALL').length,
+      medium: finalJobs.filter((j) => j.companySize === 'MEDIUM').length,
+      scaleup: finalJobs.filter((j) => j.companySize === 'SCALEUP').length,
+      large: finalJobs.filter((j) => j.companySize === 'LARGE').length,
+      enterprise: finalJobs.filter((j) => j.companySize === 'ENTERPRISE').length,
+      unknown: finalJobs.filter((j) => !j.companySize || j.companySize === 'UNKNOWN').length,
+    };
+
+    logger.info(
+      'SEARCH',
+      `[JOB_DIVERSITY]\nTotal active jobs: ${finalJobs.length}\nStartup: ${sizeCounts.startup}\nSmall: ${sizeCounts.small}\nMedium: ${sizeCounts.medium}\nScale-up: ${sizeCounts.scaleup}\nLarge: ${sizeCounts.large}\nEnterprise: ${sizeCounts.enterprise}\nUnknown: ${sizeCounts.unknown}`
+    );
+
+    return finalJobs;
   }
 
   // --- PRIVATE DETERMINISTIC SCORING HELPERS ---

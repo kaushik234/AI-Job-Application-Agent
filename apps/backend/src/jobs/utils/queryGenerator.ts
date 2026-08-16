@@ -140,6 +140,28 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     resumeQueriesSet.add('Infrastructure Engineer');
   }
 
+  // 3. Dynamic Candidate-Aware Startup & Small Company Search Variations (Phases 14 & 15)
+  if (isFlutter) {
+    resumeQueriesSet.add('Flutter Developer startup');
+    resumeQueriesSet.add('Flutter Engineer startup');
+    resumeQueriesSet.add('Flutter Developer SaaS');
+    resumeQueriesSet.add('Flutter Developer scale-up');
+    resumeQueriesSet.add('Mobile Developer startup');
+    resumeQueriesSet.add('Flutter Developer product company');
+  } else if (isReact) {
+    resumeQueriesSet.add('Frontend Engineer startup');
+    resumeQueriesSet.add('Full Stack Engineer SaaS');
+    resumeQueriesSet.add('React Developer scale-up');
+  } else if (isBackend) {
+    resumeQueriesSet.add('Node.js Developer startup');
+    resumeQueriesSet.add('Backend Engineer SaaS');
+    resumeQueriesSet.add('Backend Engineer scale-up');
+  } else {
+    resumeQueriesSet.add(`${primaryRole} startup`);
+    resumeQueriesSet.add(`${primaryRole} SaaS`);
+    resumeQueriesSet.add(`${primaryRole} scale-up`);
+  }
+
   // Fallback to top skills
   for (const skill of allSkills.slice(0, 3)) {
     if (skill.length > 2) {
@@ -147,9 +169,9 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     }
   }
 
-  const resumeQueries = Array.from(resumeQueriesSet).slice(0, 10);
+  const resumeQueries = Array.from(resumeQueriesSet).slice(0, 25);
   if (resumeQueries.length === 0) {
-    resumeQueries.push('Software Engineer', 'Developer');
+    resumeQueries.push('Software Engineer', 'Developer', 'Software Engineer startup');
   }
 
   // If explicit user search query is specified, effective search MUST be the user query.
@@ -171,4 +193,21 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     seniorityLevel,
     totalYearsExperience,
   };
+}
+
+/**
+ * Returns expanded city and remote locations for target country.
+ */
+export function getExpandedLocationsForCountry(countryCode?: string): string[] {
+  const code = (countryCode || '').toUpperCase().trim();
+  if (code === 'AU' || code === 'AUSTRALIA') {
+    return ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Canberra', 'Gold Coast', 'Newcastle', 'Remote Australia'];
+  }
+  if (code === 'CA' || code === 'CANADA') {
+    return ['Toronto', 'Vancouver', 'Montreal', 'Calgary', 'Ottawa', 'Remote Canada'];
+  }
+  if (code === 'DE' || code === 'GERMANY') {
+    return ['Berlin', 'Munich', 'Hamburg', 'Frankfurt', 'Cologne', 'Remote Germany'];
+  }
+  return ['Remote'];
 }

@@ -7,8 +7,15 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
-const GREENHOUSE_BOARDS = ['canva', 'stripe', 'figma', 'cloudflare', 'doordash'];
+const GREENHOUSE_BOARDS = [
+  'canva', 'stripe', 'figma', 'cloudflare', 'doordash', 'airbnb', 'instacart', 'robinhood',
+  'coinbase', 'plaid', 'dbtlabs', 'databricks', 'snowflake', 'confluent', 'hashicorp',
+  'mongodb', 'redis', 'elastic', 'cockroachlabs', 'clickhouse', 'supabase', 'neon',
+  'astronomer', 'prefect', 'dagster', 'airbyte', 'fivetran', 'segment', 'mixpanel',
+  'amplitude', 'posthog'
+];
 
 export class GreenhouseProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Greenhouse';
@@ -78,11 +85,21 @@ export class GreenhouseProvider extends BaseJobProvider {
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
           if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
+            return kw.some((k) => {
+              if (text.includes(k)) return true;
+              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
+              return tokens.length > 0 && tokens.every((t) => {
+                if (text.includes(t)) return true;
+                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
+                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
+                }
+                return false;
+              });
+            });
           }
           return (
             kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer'].some((t) => text.includes(t))
+            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
           );
         });
       }
@@ -141,7 +158,8 @@ export class GreenhouseProvider extends BaseJobProvider {
       url: raw.absolute_url || `https://boards.greenhouse.io/${boardToken}/jobs/${raw.id || '4829102'}`,
       description: desc,
       requirements: ['TypeScript', 'Node.js', 'React'],
-      postedDate: raw.updated_at ? raw.updated_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.updated_at) || '',
+      postedAt: normalizePostingDate(raw.updated_at),
       createdAt: new Date().toISOString(),
     };
   }

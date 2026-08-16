@@ -7,6 +7,7 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class SeekProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Seek';
@@ -35,6 +36,8 @@ export class SeekProvider extends BaseJobProvider {
           page,
           limit,
           jobs: [],
+          outcomeStatus: 'AUTH_REQUIRED',
+          message: 'Missing SEEK_API_KEY environment variable. Seek portal requires API credentials or licensed access endpoint.',
         };
       }
 
@@ -110,7 +113,8 @@ export class SeekProvider extends BaseJobProvider {
       originalUrl,
       description: raw.description || '',
       requirements: ['TypeScript', 'React', 'Node.js'],
-      postedDate: new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.postedDate || raw.datePosted || raw.createdAt) || '',
+      postedAt: normalizePostingDate(raw.postedDate || raw.datePosted || raw.createdAt),
       createdAt: new Date().toISOString(),
       discoveredAt: new Date().toISOString(),
       jobStatus: 'DISCOVERED',

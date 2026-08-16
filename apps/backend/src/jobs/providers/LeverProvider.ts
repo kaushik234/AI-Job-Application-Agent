@@ -7,8 +7,14 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
-const LEVER_COMPANIES = ['atlassian', 'netflix', 'shopify', 'spotify', 'palantir'];
+const LEVER_COMPANIES = [
+  'atlassian', 'netflix', 'shopify', 'spotify', 'palantir', 'uber', 'lyft', 'square',
+  'block', 'reddit', 'pinterest', 'snap', 'discord', 'slack', 'zoom', 'dropbox', 'box',
+  'zendesk', 'hubspot', 'freshworks', 'intercom', 'drift', 'gong', 'chorus', 'salesloft',
+  'outreach', 'apollo'
+];
 
 export class LeverProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Lever';
@@ -78,11 +84,21 @@ export class LeverProvider extends BaseJobProvider {
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
           if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
+            return kw.some((k) => {
+              if (text.includes(k)) return true;
+              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
+              return tokens.length > 0 && tokens.every((t) => {
+                if (text.includes(t)) return true;
+                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
+                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
+                }
+                return false;
+              });
+            });
           }
           return (
             kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer'].some((t) => text.includes(t))
+            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
           );
         });
       }
@@ -141,7 +157,8 @@ export class LeverProvider extends BaseJobProvider {
       url: raw.hostedUrl || `https://jobs.lever.co/${companyToken}/${raw.id || '930129'}`,
       description: desc,
       requirements: ['TypeScript', 'Node.js', 'PostgreSQL'],
-      postedDate: new Date(raw.createdAt || Date.now()).toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.createdAt) || '',
+      postedAt: normalizePostingDate(raw.createdAt),
       createdAt: new Date().toISOString(),
     };
   }

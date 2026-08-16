@@ -27,8 +27,8 @@ import { IJwtPayload, IAuthUser, ISessionInfo } from './interfaces/auth.interfac
 @Injectable()
 export class AuthService {
   private readonly jwtSecret: string;
-  private readonly jwtExpiresIn = '15m'; // 15 minutes access token
-  private readonly refreshTokenExpiresDays = 7;
+  private readonly jwtExpiresIn = '7d'; // 7 days access token for dev/agent session stability
+  private readonly refreshTokenExpiresDays = 30;
   private readonly inMemoryUsers = new Map<string, any>();
 
   constructor(

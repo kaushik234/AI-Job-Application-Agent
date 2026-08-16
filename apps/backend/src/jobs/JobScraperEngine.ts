@@ -39,6 +39,7 @@ export interface SearchEngineCrawlReport {
   duplicatesFiltered: number;
   providersProcessed: number;
   providerBreakdown: Record<string, { scraped: number; status: string; message?: string }>;
+  rejectionStats?: Record<string, number>;
   jobs: JobListing[];
 }
 
@@ -102,14 +103,8 @@ export class JobScraperEngine {
     // 3. Structured JOB_SCRAPE diagnostic logs
     const candidateName = masterResume?.fullName || 'Kaushik Khandala';
     const countriesLogStr = isWorldwide ? 'ALL' : query.countries!.join(', ');
-    logger.info('SEARCH', `[JOB_SCRAPE] Starting scrape`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Query: ${derived.userQuery || 'None'}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Worldwide: ${isWorldwide ? 'true' : 'false'}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Mode: ${mode}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Countries: ${countriesLogStr}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Visa only: ${visaOnly ? 'true' : 'false'}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Remote only: ${remoteOnly ? 'true' : 'false'}`);
-    logger.info('SEARCH', `[JOB_SCRAPE] Resume: ${candidateName}`);
+    logger.info('SEARCH', `[SCRAPE_START] candidate=${candidateName}`);
+    logger.info('SEARCH', `[SCRAPE_QUERY] query=${derived.userQuery || 'All'} countries=${countriesLogStr} visaOnly=${visaOnly} remoteOnly=${remoteOnly}`);
 
     const providerBreakdown: Record<string, { scraped: number; status: string; message?: string }> = {};
 
@@ -117,47 +112,93 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
-    // 4. Execute provider searches concurrently with proper multi-page iteration
+    const activeSubQueries = derived.userQuery
+      ? [derived.userQuery]
+      : (derived.keywords && derived.keywords.length > 0 ? derived.keywords.slice(0, 10) : ['Software Engineer']);
+
+    // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {
       try {
-        const providerJobs: JobListing[] = [];
-        const seenIds = new Set<string>();
-        let currentPage = pagination.page || 1;
-        let pagesFetched = 0;
+        logger.info('SEARCH', `[PROVIDER_START] provider=${provider.platform}`);
+        const providerTask = async () => {
+          const providerJobs: JobListing[] = [];
+          const seenIds = new Set<string>();
 
-        while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
-          const result = await provider.search(searchQuery, { page: currentPage, limit: pageLimit });
-          pagesFetched++;
+          for (const subQuery of activeSubQueries) {
+            if (providerJobs.length >= targetCollectionLimit) break;
 
-          if (!result || !result.jobs || result.jobs.length === 0) {
-            break;
-          }
+            const currentSearchQuery: JobSearchQuery = {
+              ...searchQuery,
+              q: subQuery,
+              userQuery: subQuery,
+              keywords: [subQuery],
+            };
 
-          for (const job of result.jobs) {
-            const key = job.id || job.url;
-            if (!seenIds.has(key)) {
-              seenIds.add(key);
-              providerJobs.push(job);
+            if (!provider.supports(currentSearchQuery)) continue;
+
+            let currentPage = pagination.page || 1;
+            let pagesFetched = 0;
+
+            while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
+              logger.info('SEARCH', `[DISCOVERY_START] provider=${provider.platform} query="${subQuery}" page=${currentPage}`);
+              const result = await provider.search(currentSearchQuery, { page: currentPage, limit: pageLimit });
+              pagesFetched++;
+
+              if (!result || !result.jobs || result.jobs.length === 0) {
+                break;
+              }
+
+              logger.info(
+                'SEARCH',
+                `[DISCOVERY_PROVIDER] provider=${provider.platform} query="${subQuery}" page=${currentPage} fetched=${result.jobs.length}`
+              );
+
+              for (const job of result.jobs) {
+                const key = job.id || job.url;
+                if (!seenIds.has(key)) {
+                  seenIds.add(key);
+                  providerJobs.push(job);
+                }
+              }
+
+              if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
+                break;
+              }
+
+              currentPage++;
             }
           }
 
-          if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
-            break;
-          }
+          return providerJobs;
+        };
 
-          currentPage++;
-        }
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Provider search request timeout (12s limit)')), 12000)
+        );
+
+        const providerJobs = await Promise.race([providerTask(), timeoutPromise]);
+
+        const outcome = providerJobs.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
 
         logger.info(
           'SEARCH',
-          `[JOB_COLLECTION]\nProvider: ${provider.platform}\nCollected: ${providerJobs.length}\nTarget: ${targetCollectionLimit}\nPagesFetched: ${pagesFetched}`
+          `[DISCOVERY_RESPONSE] provider=${provider.platform} count=${providerJobs.length} outcome=${outcome}`
         );
 
-        providerBreakdown[provider.platform] = { scraped: providerJobs.length, status: 'SUCCESS' };
+        providerBreakdown[provider.platform] = { scraped: providerJobs.length, status: outcome };
         return providerJobs;
       } catch (err: any) {
-        logger.error('ERROR', `Crawl failed for provider ${provider.platform}: ${err.message}`);
-        providerBreakdown[provider.platform] = { scraped: 0, status: 'FAILED', message: err.message };
+        const errMessage = err.message || '';
+        let outcome = 'FAILED';
+        if (errMessage.includes('timeout') || errMessage.includes('12s limit')) {
+          outcome = 'TIMEOUT';
+        } else if (errMessage.includes('ECONN') || errMessage.includes('network')) {
+          outcome = 'NETWORK_ERROR';
+        } else {
+          outcome = 'PARSER_FAILED';
+        }
+        logger.warn('SEARCH', `[PROVIDER_ERROR] provider=${provider.platform} outcome=${outcome} error=${errMessage}`);
+        providerBreakdown[provider.platform] = { scraped: 0, status: outcome, message: errMessage };
         return [] as JobListing[];
       }
     });
@@ -229,6 +270,18 @@ export class JobScraperEngine {
       `[JOB_VERIFICATION] Verifying ${deduplicated.length} deduplicated jobs before ranking/saving`
     );
 
+    const rejectionStats: Record<string, number> = {
+      SOURCE_MISMATCH: 0,
+      EXPIRED: 0,
+      INVALID_URL: 0,
+      COUNTRY_MISMATCH: 0,
+      TITLE_MISMATCH: 0,
+      COMPANY_MISMATCH: 0,
+      NOT_APPLYABLE: 0,
+      ROLE_NOT_RELEVANT: 0,
+      OTHER: 0,
+    };
+
     const verifiedJobs: JobListing[] = [];
 
     for (const job of deduplicated) {
@@ -237,23 +290,39 @@ export class JobScraperEngine {
 
         if (
           verifiedJob.sourceVerified === true &&
-          verifiedJob.verificationStatus === 'ACTIVE'
+          verifiedJob.verificationStatus === 'ACTIVE' &&
+          verifiedJob.jobIdentityVerified !== false
         ) {
           verifiedJobs.push(verifiedJob);
         } else {
+          const statusKey = String(verifiedJob.verificationStatus || 'OTHER');
+          if (statusKey in rejectionStats) {
+            rejectionStats[statusKey]++;
+          } else {
+            rejectionStats.OTHER++;
+          }
           logger.info(
             'SEARCH',
-            `[JOB_VERIFICATION] Excluded ${job.company} - ${job.title}: ${verifiedJob.verificationReason || verifiedJob.verificationStatus
-            }`
+            `[JOB_VERIFICATION] Excluded ${job.company} - ${job.title}: ${verifiedJob.verificationReason || verifiedJob.verificationStatus}`
           );
         }
       } catch (err: any) {
+        rejectionStats.OTHER++;
         logger.error(
           'ERROR',
           `[JOB_VERIFICATION] Failed for ${job.company} - ${job.title}: ${err.message}`
         );
       }
     }
+
+    console.log('[SCRAPE_TRACE] [3] VERIFICATION', {
+      stage: 'VERIFICATION',
+      rawCount: rawJobs.length,
+      deduplicatedCount: deduplicated.length,
+      verifiedCount: verifiedJobs.length,
+      rejectionStats,
+      jobIds: verifiedJobs.map((j) => j.id),
+    });
 
     logger.info(
       'SEARCH',
@@ -269,6 +338,7 @@ export class JobScraperEngine {
       if (relevant) {
         roleRelevantJobs.push(job);
       } else {
+        rejectionStats.ROLE_NOT_RELEVANT++;
         logger.info(
           'SEARCH',
           `[JOB_RELEVANCE] Excluded ${job.company} - ${job.title}: role is not relevant to candidate profile`,
@@ -287,38 +357,48 @@ export class JobScraperEngine {
       masterResume,
     );
 
+    console.log('[SCRAPE_TRACE] [4] RANKING', {
+      stage: 'RANKING',
+      jobsCount: scoredRawJobs.length,
+      verifiedCount: verifiedJobs.length,
+      finalCount: scoredRawJobs.length,
+      jobIds: scoredRawJobs.map((j) => j.id),
+    });
+
     // 8. Persist only verified active jobs
     if (scoredRawJobs.length > 0) {
       await this.jobRepo.saveMany(scoredRawJobs);
+      console.log('[SCRAPE_TRACE] [5] REPOSITORY INSERT', {
+        stage: 'REPOSITORY_INSERT',
+        insertedCount: scoredRawJobs.length,
+        jobIds: scoredRawJobs.map((j) => j.id),
+      });
+
+      const repoVerification = await this.jobRepo.findJobs();
+      console.log('[SCRAPE_TRACE] [6] REPOSITORY QUERY', {
+        stage: 'REPOSITORY_QUERY',
+        jobsCount: repoVerification.length,
+        jobIds: repoVerification.filter((j) => scoredRawJobs.some((s) => s.id === j.id)).map((j) => j.id),
+      });
     }
 
     // 8. Top 50 jobs ordered by priority and matchScore
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
-    logger.info(
-        'SEARCH',
-        `[JOB_DEDUP] After deduplication: ${deduplicated.length}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_VERIFICATION] After live verification: ${verifiedJobs.length}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_RELEVANCE] After relevance filtering: ${roleRelevantJobs.length}/${verifiedJobs.length}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_RANKING] After resume ranking: ${scoredRawJobs.length}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_SCRAPE] After top 50 selection: ${top50Jobs.length}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_SCRAPE] Returning: ${top50Jobs.length} jobs`
-      );
+    logger.info('SEARCH', `[JOB_DEDUP] After deduplication: ${deduplicated.length}`);
+    logger.info('SEARCH', `[VERIFICATION] active=${verifiedJobs.length}/${deduplicated.length}`);
+    logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${verifiedJobs.length}`);
+    logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
+    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length}`);
+
+    console.log('[SCRAPE_TRACE] [2] DISCOVERY ENGINE RETURN', {
+      stage: 'DISCOVERY_ENGINE_RETURN',
+      jobsCount: top50Jobs.length,
+      rawCount: rawJobs.length,
+      totalUniqueNew: scoredRawJobs.length,
+      providerBreakdown,
+      jobIds: top50Jobs.map((j) => j.id),
+    });
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,
@@ -335,6 +415,7 @@ export class JobScraperEngine {
       duplicatesFiltered: duplicatesRemovedCount,
       providersProcessed: this.providers.length,
       providerBreakdown,
+      rejectionStats,
       jobs: top50Jobs,
     };
   }

@@ -142,6 +142,47 @@ export class JobController {
   };
 
   /**
+   * POST /api/jobs/:id/verify-original - Controlled revalidation check before opening external job link
+   */
+  public verifyOriginalPost = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const job = await db.getJobById(id);
+      if (!job) {
+        res.status(404).json({ success: false, error: 'Job listing not found' });
+        return;
+      }
+
+      const { jobVerificationService } = require('../services/JobVerificationService');
+      const isFresh = jobVerificationService.isVerificationFresh(job, 6);
+
+      let verifiedJob = job;
+      if (!isFresh || !job.sourceVerified || job.jobStatus !== 'ACTIVE') {
+        verifiedJob = await jobVerificationService.verifyOrRevalidateJob(job, true);
+      }
+
+      const minutesAgo = verifiedJob.lastVerifiedAt
+        ? Math.max(0, Math.floor((Date.now() - new Date(verifiedJob.lastVerifiedAt).getTime()) / 60000))
+        : 0;
+
+      const isLive = verifiedJob.sourceVerified === true && (verifiedJob.jobStatus === 'ACTIVE' || verifiedJob.verificationStatus === 'ACTIVE');
+
+      res.json({
+        success: true,
+        canOpen: isLive,
+        finalUrl: verifiedJob.finalUrl || verifiedJob.originalUrl || verifiedJob.url,
+        jobStatus: verifiedJob.jobStatus,
+        sourceVerified: verifiedJob.sourceVerified,
+        reason: verifiedJob.verificationReason || (isLive ? 'Job posting is active' : 'This job is no longer available.'),
+        lastVerifiedAt: verifiedJob.lastVerifiedAt,
+        minutesAgo,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+
+  /**
    * POST /api/jobs/reverify-all - Re-verify all jobs in database
    */
   public reverifyAll = async (req: Request, res: Response): Promise<void> => {

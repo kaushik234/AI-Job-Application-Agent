@@ -7,6 +7,7 @@
 import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class LinkedInProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'LinkedIn';
@@ -35,6 +36,8 @@ export class LinkedInProvider extends BaseJobProvider {
           page,
           limit,
           jobs: [],
+          outcomeStatus: 'AUTH_REQUIRED',
+          message: 'Missing LINKEDIN_API_KEY environment variable. Direct portal API access requires licensed API key or partner integration.',
         };
       }
 
@@ -107,7 +110,8 @@ export class LinkedInProvider extends BaseJobProvider {
       url: raw.link || 'https://www.linkedin.com/jobs/view/391029318',
       description: raw.descriptionText || '',
       requirements: ['React', 'TypeScript', 'GraphQL'],
-      postedDate: new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.postedDate || raw.listedAt || raw.createdAt) || '',
+      postedAt: normalizePostingDate(raw.postedDate || raw.listedAt || raw.createdAt),
       createdAt: new Date().toISOString(),
     };
   }

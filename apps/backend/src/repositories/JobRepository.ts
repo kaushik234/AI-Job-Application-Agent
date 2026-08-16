@@ -23,10 +23,32 @@ export class JobRepository {
     remoteOnly?: boolean;
     visaOnly?: boolean;
     searchQuery?: string;
+    includeDemo?: boolean;
   }): Promise<JobListing[]> {
-    let jobs = await this.database.getAllJobs();
+    let jobs = filter?.includeDemo ? await this.database.getAllJobs() : await this.database.getLiveJobs();
 
-    let filteredJobs = jobs;
+    // Absolute Zero Fake Jobs Security Boundary
+    let filteredJobs = jobs.filter((j) => {
+      if (filter?.includeDemo) return true;
+
+      const companyLower = (j.company || '').toLowerCase();
+      const idLower = (j.id || '').toLowerCase();
+
+      const isSynthetic =
+        j.isDemoJob === true ||
+        j.jobStatus === 'DEMO_ONLY' ||
+        j.verificationStatus === 'DEMO_ONLY' ||
+        idLower.includes('demo') ||
+        idLower.includes('mock') ||
+        idLower.includes('e2e') ||
+        companyLower.includes('demo technologies') ||
+        companyLower.includes('company alpha') ||
+        companyLower.includes('company beta') ||
+        companyLower.includes('factcorp') ||
+        companyLower.includes('example corp');
+
+      return j.sourceVerified === true && (j.verificationStatus === 'ACTIVE' || j.jobStatus === 'ACTIVE') && !isSynthetic;
+    });
 
     if (filter) {
       if (filter.countries && filter.countries.length > 0) {

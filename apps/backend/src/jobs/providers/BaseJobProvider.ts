@@ -24,18 +24,91 @@ export interface PaginationOptions {
   maxPages?: number;
 }
 
+export type ProviderOutcomeStatus =
+  | 'SUCCESS_WITH_RESULTS'
+  | 'SUCCESS_ZERO_RESULTS'
+  | 'BLOCKED'
+  | 'RATE_LIMITED'
+  | 'AUTH_REQUIRED'
+  | 'TIMEOUT'
+  | 'NETWORK_ERROR'
+  | 'PARSER_FAILED'
+  | 'SOURCE_CHANGED'
+  | 'UNSUPPORTED';
+
+export type ProviderFailureStage =
+  | 'REQUEST'
+  | 'AUTH'
+  | 'HTTP'
+  | 'REDIRECT'
+  | 'PARSER'
+  | 'NORMALIZATION'
+  | 'COUNTRY_FILTER'
+  | 'DEDUPLICATION'
+  | 'VERIFICATION'
+  | 'APPLYABILITY'
+  | 'NONE';
+
+export interface ProviderTelemetry {
+  provider: JobPlatform;
+  query: string;
+  country: string;
+  requestStartedAt?: string;
+  requestFinishedAt?: string;
+  requestUrl?: string;
+  httpStatus?: number;
+  finalUrl?: string;
+  contentType?: string;
+  responseBytes?: number;
+  authenticationState?: 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'KEY_MISSING' | 'BLOCKED';
+  rawCandidateCount: number;
+  parsedCandidateCount: number;
+  normalizedCandidateCount: number;
+  deduplicatedCandidateCount: number;
+  countryFilteredCount: number;
+  identityVerificationCount: number;
+  identityRejectedCount: number;
+  applyabilityRejectedCount: number;
+  finalCount: number;
+  failureStage: ProviderFailureStage;
+  failureReason?: string;
+  outcomeStatus: ProviderOutcomeStatus;
+}
+
 export interface PaginatedJobResults {
   provider: JobPlatform;
   totalFound: number;
   page: number;
   limit: number;
   jobs: JobListing[];
+  outcomeStatus?: ProviderOutcomeStatus;
+  failureStage?: ProviderFailureStage;
+  message?: string;
+  telemetry?: ProviderTelemetry;
 }
 
-export abstract class BaseJobProvider {
+export interface JobDiscoveryProvider {
+  name: JobPlatform;
+  searchJobs(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults>;
+  supports(query: JobSearchQuery): boolean;
+}
+
+export abstract class BaseJobProvider implements JobDiscoveryProvider {
   abstract readonly platform: JobPlatform;
   abstract readonly rateLimitMs: number;
   abstract readonly maxRetries: number;
+
+  public get name(): JobPlatform {
+    return this.platform;
+  }
+
+  public supports(_query: JobSearchQuery): boolean {
+    return true;
+  }
+
+  public async searchJobs(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
+    return this.search(query, pagination);
+  }
 
   private lastRequestTime: number = 0;
 

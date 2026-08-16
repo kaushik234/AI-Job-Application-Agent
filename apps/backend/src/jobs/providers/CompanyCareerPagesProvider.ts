@@ -8,6 +8,7 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 
 import { logger } from '@sentinel/shared';
+import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class CompanyCareerPagesProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Company Career Page';
@@ -18,6 +19,23 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
     return this.retry(async () => {
       const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
 
+      // In production mode, do NOT inject synthetic fixtures into live discovery
+      if (process.env.NODE_ENV !== 'test') {
+        const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
+        logger.info(
+          'SEARCH',
+          `[JOB_SOURCE] Provider: Company Career Page | Status: SUCCESS_ZERO_RESULTS | Message: Direct career pages require explicit company target URL`
+        );
+        return {
+          provider: this.platform,
+          totalFound: 0,
+          page,
+          limit,
+          jobs: [],
+          outcomeStatus: 'SUCCESS_ZERO_RESULTS',
+        };
+      }
+
       const rawCareerPostings = [
         {
           id: 'careers-canva-8192',
@@ -26,70 +44,9 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
           location: 'Sydney, NSW, Australia',
           country: 'AU',
           canonicalUrl: 'https://www.canva.com/careers/jobs/8192-senior-flutter-developer',
-          description: 'Canva global mobile engineering team in Sydney. Build next-generation cross-platform iOS and Android mobile features using Flutter, Dart, BLoC state management, and high-performance graphics engines. Full relocation & visa sponsorship available.',
-          requirements: ['5+ years mobile engineering experience', 'Flutter & Dart expertise', 'iOS (Swift) / Android (Kotlin) native channels'],
-          compensation: '$180,000 - $220,000 AUD + Equity',
-          minSalary: 180000,
-          maxSalary: 220000,
-          currency: 'AUD',
-          remote: true,
-          hybrid: true,
-          visaSponsorship: true,
+          description: 'Canva mobile team in Sydney. Flutter, Dart, BLoC.',
+          requirements: ['Flutter', 'Dart'],
           publishedDate: '2026-08-07',
-        },
-        {
-          id: 'careers-shopify-9012',
-          company: 'Shopify',
-          title: 'Flutter Developer (Mobile)',
-          location: 'Toronto, ON, Canada',
-          country: 'CA',
-          canonicalUrl: 'https://www.shopify.com/careers/jobs/9012-flutter-mobile-developer',
-          description: 'Shopify Point of Sale & Merchant Mobile team. Build responsive, high-speed mobile applications using Flutter, Dart, and GraphQL API integrations. Full LMIA and work permit sponsorship supported.',
-          requirements: ['Senior Flutter & Dart development knowledge', 'State management (Provider, Riverpod, or BLoC)', 'Mobile CI/CD pipelines'],
-          compensation: '$165,000 - $205,000 CAD',
-          minSalary: 165000,
-          maxSalary: 205000,
-          currency: 'CAD',
-          remote: true,
-          hybrid: false,
-          visaSponsorship: true,
-          publishedDate: '2026-08-06',
-        },
-        {
-          id: 'careers-sap-7718',
-          company: 'SAP',
-          title: 'Lead Flutter Engineer',
-          location: 'Berlin, Germany',
-          country: 'DE',
-          canonicalUrl: 'https://jobs.sap.com/careers/jobs/7718-lead-flutter-engineer',
-          description: 'SAP Enterprise Mobile Suite in Berlin. Lead mobile architecture using Flutter, Dart, and REST microservices. Relocation package & EU Blue Card visa sponsorship available.',
-          requirements: ['Lead mobile developer background', 'Flutter, Dart, Clean Architecture', 'EU Blue Card visa eligibility'],
-          compensation: '€110,000 - €140,000 EUR',
-          minSalary: 110000,
-          maxSalary: 140000,
-          currency: 'EUR',
-          remote: true,
-          hybrid: true,
-          visaSponsorship: true,
-          publishedDate: '2026-08-05',
-        },
-        {
-          id: 'careers-zendesk-4412',
-          company: 'Zendesk',
-          title: 'Flutter App Builder',
-          location: 'Vancouver, BC, Canada',
-          country: 'CA',
-          canonicalUrl: 'https://www.zendesk.com/careers/jobs/4412-flutter-app-builder',
-          description: 'Zendesk Mobile CX SDK team. Develop cross-platform customer support SDKs and mobile apps using Flutter, Dart, and WebSockets. Full work permit visa support.',
-          requirements: ['Flutter & Dart app development', 'SDK architecture & API design', 'Vancouver or Remote Canada'],
-          compensation: '$150,000 - $185,000 CAD',
-          minSalary: 150000,
-          maxSalary: 185000,
-          currency: 'CAD',
-          remote: true,
-          hybrid: false,
-          visaSponsorship: true,
-          publishedDate: '2026-08-04',
         },
       ];
 
@@ -113,11 +70,21 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description} ${(job.requirements || []).join(' ')}`.toLowerCase();
           if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
+            return kw.some((k) => {
+              if (text.includes(k)) return true;
+              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
+              return tokens.length > 0 && tokens.every((t) => {
+                if (text.includes(t)) return true;
+                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
+                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
+                }
+                return false;
+              });
+            });
           }
           return (
             kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile'].some((t) => text.includes(t))
+            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
           );
         });
       }
@@ -172,7 +139,8 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
       url: raw.canonicalUrl || `https://careers.example.com/jobs/${raw.id}`,
       description: desc,
       requirements: reqs,
-      postedDate: raw.publishedDate || new Date().toISOString().split('T')[0],
+      postedDate: normalizePostingDate(raw.publishedDate) || '',
+      postedAt: normalizePostingDate(raw.publishedDate),
       createdAt: new Date().toISOString(),
     };
   }
