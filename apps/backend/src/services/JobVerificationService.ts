@@ -16,7 +16,7 @@ export class JobVerificationService {
    * Centralized verification entrypoint.
    * Performs deep content inspection and source-specific pattern matching.
    */
-  public async verifyExternalJob(job: JobListing): Promise<ExternalJobVerificationResult> {
+  public async verifyExternalJob(job: JobListing, searchQuery?: string): Promise<ExternalJobVerificationResult> {
     const timestamp = new Date().toISOString();
     const targetUrl = job.url || job.originalUrl;
     const jobIdLower = (job.id || '').toLowerCase();
@@ -161,14 +161,25 @@ export class JobVerificationService {
         urlLower.includes('active-job') ||
         urlLower.includes('amazon.jobs')
       ) {
+        const countryRes = this.deriveCanonicalCountry(job.location, job.country);
+        const searchRelevance = this.verifySearchQueryRelevance(job, searchQuery, job.title, job.description);
+        const isSearchMatch = searchRelevance.searchRelevanceVerified;
+
         const res: ExternalJobVerificationResult = {
-          verified: true,
-          status: JobLifecycleStatus.ACTIVE,
-          reason: 'Live job posting verified with title and job-specific content.',
+          verified: isSearchMatch,
+          status: isSearchMatch ? JobLifecycleStatus.ACTIVE : JobLifecycleStatus.SEARCH_QUERY_MISMATCH,
+          reason: isSearchMatch ? 'Live job posting verified with title and job-specific content.' : searchRelevance.searchRelevanceReason,
           httpStatus: 200,
           finalUrl: targetUrl,
           detectedTitle: job.title,
           detectedCompany: job.company,
+          verifiedCountry: countryRes.country,
+          countryVerified: countryRes.isVerified,
+          countrySource: countryRes.source,
+          countryMismatch: countryRes.isVerified && countryRes.country !== job.country,
+          searchRelevance,
+          hasApplicationForm: true,
+          hasApplyButton: true,
           verifiedAt: timestamp,
         };
         await this.updateJobRecord(job, res);
@@ -225,6 +236,138 @@ export class JobVerificationService {
   }
 
   /**
+   * Derives canonical country code from verified location string.
+   */
+  public deriveCanonicalCountry(locationText?: string, defaultCountry?: string): { country: string; isVerified: boolean; source: string } {
+    if (!locationText || locationText.trim().length === 0) {
+      return { country: defaultCountry || 'UNKNOWN', isVerified: false, source: 'unspecified' };
+    }
+    const locLower = locationText.toLowerCase().trim();
+
+    if (locLower.includes('australia') || locLower.includes('sydney') || locLower.includes('melbourne') || locLower.includes('brisbane') || locLower.includes('perth') || locLower.includes('adelaide') || locLower.includes(', nsw') || locLower.includes(', vic') || locLower.includes(', qld')) {
+      return { country: 'AU', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('canada') || locLower.includes('toronto') || locLower.includes('vancouver') || locLower.includes('montreal') || locLower.includes('calgary') || locLower.includes('ottawa') || locLower.includes(', ontario') || locLower.includes(', bc')) {
+      return { country: 'CA', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('germany') || locLower.includes('berlin') || locLower.includes('munich') || locLower.includes('hamburg') || locLower.includes('frankfurt') || locLower.includes('deutschland')) {
+      return { country: 'DE', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('austria') || locLower.includes('vienna') || locLower.includes('wien') || locLower.includes('österreich')) {
+      return { country: 'AT', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('united states') || locLower.includes('usa') || locLower.includes('san francisco') || locLower.includes('new york') || locLower.includes('austin') || locLower.includes('seattle') || locLower.includes(', ca') || locLower.includes(', ny') || locLower.includes(', tx') || locLower.includes(', wa')) {
+      return { country: 'US', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('united kingdom') || locLower.includes('uk') || locLower.includes('london') || locLower.includes('manchester')) {
+      return { country: 'GB', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('singapore')) {
+      return { country: 'SG', isVerified: true, source: 'location_text' };
+    }
+    if (locLower.includes('india') || locLower.includes('bengaluru') || locLower.includes('bangalore') || locLower.includes('mumbai') || locLower.includes('delhi') || locLower.includes('ahmedabad')) {
+      return { country: 'IN', isVerified: true, source: 'location_text' };
+    }
+
+    return { country: defaultCountry || 'UNKNOWN', isVerified: false, source: 'default_fallback' };
+  }
+
+  /**
+   * Evaluates Search Query Relevance Gate (Phase 1).
+   * Verifies whether a verified external job actually matches what the user searched for.
+   */
+  public verifySearchQueryRelevance(
+    job: JobListing,
+    searchQuery?: string,
+    verifiedTitle?: string,
+    verifiedDescription?: string
+  ): SearchQueryRelevanceResult {
+    const rawQuery = (searchQuery || job.title || '').trim().toLowerCase();
+    if (!rawQuery || rawQuery === 'all' || rawQuery === 'worldwide' || rawQuery.length < 2) {
+      return {
+        searchRelevanceVerified: true,
+        searchRelevanceScore: 1.0,
+        searchRelevanceReason: 'Broad search query allows all verified roles.',
+        searchQuery: rawQuery,
+      };
+    }
+
+    const titleToUse = (verifiedTitle || job.title || '').toLowerCase();
+    const descToUse = (verifiedDescription || job.description || '').toLowerCase();
+    const fullText = `${titleToUse} ${job.company.toLowerCase()} ${descToUse}`;
+
+    // Target technology keyword extraction
+    const techKeywords = ['flutter', 'react', 'python', 'golang', 'node', 'ios', 'android', 'swift', 'kotlin', 'c++', 'rust', 'java'];
+    const targetTechs = techKeywords.filter((t) => rawQuery.includes(t));
+
+    if (targetTechs.length > 0) {
+      for (const tech of targetTechs) {
+        // Direct title match (e.g. "Flutter Developer", "Senior Flutter Engineer")
+        if (titleToUse.includes(tech)) {
+          return {
+            searchRelevanceVerified: true,
+            searchRelevanceScore: 1.0,
+            searchRelevanceReason: `Verified job title explicitly contains target search technology (${tech}).`,
+            searchQuery: rawQuery,
+          };
+        }
+
+        // Broad role title (e.g. "Mobile Engineer", "Cross Platform Engineer") -> Require explicit tech in verified description
+        const isMobileOrCrossPlatformRole =
+          titleToUse.includes('mobile') ||
+          titleToUse.includes('cross platform') ||
+          titleToUse.includes('application') ||
+          titleToUse.includes('frontend');
+
+        if (isMobileOrCrossPlatformRole) {
+          if (descToUse.includes(tech) || descToUse.includes('dart')) {
+            return {
+              searchRelevanceVerified: true,
+              searchRelevanceScore: 0.85,
+              searchRelevanceReason: `Verified job description explicitly requires target search technology (${tech}).`,
+              searchQuery: rawQuery,
+            };
+          }
+        }
+
+        // If job title is specific to ANOTHER domain/platform (e.g., "Senior Software Engineer (iOS), SDK", "Backend Go Engineer", "Infra Engineer") and lacks target tech in description => REJECT
+        return {
+          searchRelevanceVerified: false,
+          searchRelevanceScore: 0.10,
+          searchRelevanceReason: `Target search query "${rawQuery}" missing from verified job title ("${verifiedTitle || job.title}") and verified job content.`,
+          searchQuery: rawQuery,
+        };
+      }
+    }
+
+    // Tokenized query matching for general searches
+    const queryTokens = rawQuery.split(/\s+/).filter((t) => t.length > 2);
+    const matchesAllTokens = queryTokens.every((token) => {
+      if (fullText.includes(token)) return true;
+      if (token === 'developer' || token === 'engineer' || token === 'programmer') {
+        return fullText.includes('engineer') || fullText.includes('developer') || fullText.includes('programmer');
+      }
+      return false;
+    });
+
+    if (matchesAllTokens) {
+      return {
+        searchRelevanceVerified: true,
+        searchRelevanceScore: 0.90,
+        searchRelevanceReason: 'Verified job content satisfies search query tokens.',
+        searchQuery: rawQuery,
+      };
+    }
+
+    return {
+      searchRelevanceVerified: false,
+      searchRelevanceScore: 0.20,
+      searchRelevanceReason: `Verified job content does not satisfy search query "${rawQuery}".`,
+      searchQuery: rawQuery,
+    };
+  }
+
+  /**
    * Evaluates title match score and verifies that the external page title corresponds to the discovered job.
    */
   public calculateTitleMatchScore(
@@ -234,8 +377,12 @@ export class JobVerificationService {
     if (!discoveredTitle) {
       return { score: 0, isMatch: false, reason: 'Missing discovered title.' };
     }
-    if (!detectedTitle) {
-      return { score: 0.8, isMatch: true };
+    if (!detectedTitle || detectedTitle.trim() === '') {
+      return {
+        score: 0,
+        isMatch: false,
+        reason: 'External job title could not be independently verified',
+      };
     }
 
     const normDiscovered = discoveredTitle.toLowerCase().trim();
@@ -488,19 +635,59 @@ export class JobVerificationService {
       };
     }
 
-    // 7. TITLE & COMPANY ALIGNMENT CHECK
+    // 7. TITLE, COMPANY, LOCATION & SEARCH RELEVANCE CHECK
     let detectedTitle: string | undefined;
     let detectedCompany: string | undefined;
+    let detectedLocation: string | undefined;
+    let detectedDescription: string | undefined;
 
-    const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-    if (titleMatch && titleMatch[1]) {
-      detectedTitle = titleMatch[1].trim();
+    // JSON-LD Metadata Extraction
+    try {
+      const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/is);
+      if (jsonLdMatch && jsonLdMatch[1]) {
+        const jsonLd = JSON.parse(jsonLdMatch[1]);
+        if (jsonLd['@type'] === 'JobPosting') {
+          detectedTitle = jsonLd.title || jsonLd.headline || jsonLd.name;
+          detectedCompany = jsonLd.hiringOrganization?.name;
+          if (jsonLd.jobLocation) {
+            const loc = jsonLd.jobLocation.address || jsonLd.jobLocation;
+            detectedLocation = `${loc.addressLocality || ''}, ${loc.addressCountry || ''}`.trim();
+          }
+          detectedDescription = jsonLd.description;
+        }
+      }
+    } catch (_) {}
+
+    if (!detectedTitle) {
+      const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+      if (h1Match && h1Match[1]) {
+        const h1Clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
+        if (h1Clean && !h1Clean.toLowerCase().includes('careers') && !h1Clean.toLowerCase().includes('open positions')) {
+          detectedTitle = h1Clean;
+        }
+      }
     }
 
-    const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-    if (h1Match && h1Match[1]) {
-      const h1Clean = h1Match[1].replace(/<[^>]+>/g, '').trim();
-      if (h1Clean) detectedTitle = h1Clean;
+    if (!detectedTitle) {
+      const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+      if (titleMatch && titleMatch[1]) {
+        const pageTitle = titleMatch[1].trim();
+        const lowerPageTitle = pageTitle.toLowerCase();
+        const isGenericTitle =
+          lowerPageTitle === 'careers' ||
+          lowerPageTitle.includes('careers |') ||
+          lowerPageTitle.includes('job board') ||
+          lowerPageTitle.includes('ashby') ||
+          lowerPageTitle.includes('greenhouse') ||
+          lowerPageTitle.includes('workable') ||
+          lowerPageTitle.includes('lever') ||
+          lowerPageTitle.includes('open positions') ||
+          lowerPageTitle.includes('jobs at ');
+
+        if (!isGenericTitle) {
+          detectedTitle = pageTitle;
+        }
+      }
     }
 
     const titleVerification = this.calculateTitleMatchScore(job.title || '', detectedTitle);
@@ -522,6 +709,53 @@ export class JobVerificationService {
       };
     }
 
+    // Derive Canonical Country (Phase 4)
+    const locForCountry = detectedLocation || job.location;
+    const countryRes = this.deriveCanonicalCountry(locForCountry, job.country);
+    const countryMismatch = countryRes.isVerified && countryRes.country !== job.country;
+
+    // Evaluate Search Query Relevance (Phase 1)
+    const searchRelevance = this.verifySearchQueryRelevance(job, undefined, detectedTitle, detectedDescription || html);
+
+    if (!searchRelevance.searchRelevanceVerified) {
+      return {
+        verified: false,
+        status: JobLifecycleStatus.SEARCH_QUERY_MISMATCH,
+        reason: searchRelevance.searchRelevanceReason,
+        httpStatus,
+        finalUrl,
+        detectedTitle,
+        detectedCompany,
+        detectedLocation,
+        verifiedCountry: countryRes.country,
+        countryVerified: countryRes.isVerified,
+        countrySource: countryRes.source,
+        countryMismatch,
+        jobIdentityVerified: true,
+        titleMatchScore: titleVerification.score,
+        searchRelevance,
+        verifiedAt: timestamp,
+      };
+    }
+
+    // Application Form Evidence Detection (Phase 5)
+    const hasApplicationForm =
+      htmlLower.includes('<form') ||
+      htmlLower.includes('type="file"') ||
+      htmlLower.includes('name="resume"') ||
+      htmlLower.includes('name="email"') ||
+      htmlLower.includes('id="application-form"') ||
+      htmlLower.includes('textarea name="cover');
+
+    const hasApplyButton =
+      htmlLower.includes('href=') &&
+      (htmlLower.includes('/apply') ||
+        htmlLower.includes('apply-btn') ||
+        htmlLower.includes('class="apply') ||
+        htmlLower.includes('data-action="apply') ||
+        htmlLower.includes('apply for this job') ||
+        htmlLower.includes('submit application'));
+
     // 8. POSITIVE EVIDENCE FOR ACTIVE STATUS
     const hasJobContentEvidence =
       html.length > 150 &&
@@ -537,22 +771,31 @@ export class JobVerificationService {
       return {
         verified: true,
         status: JobLifecycleStatus.ACTIVE,
-        reason: 'Live job posting verified with title and job-specific content.',
+        reason: 'Live job posting verified with title, job-specific content, and application path.',
         httpStatus,
         finalUrl,
         detectedTitle,
         detectedCompany,
+        detectedLocation,
+        verifiedCountry: countryRes.country,
+        countryVerified: countryRes.isVerified,
+        countrySource: countryRes.source,
+        countryMismatch,
         jobIdentityVerified: true,
         titleMatchScore: titleVerification.score,
         companyMatchScore: 1.0,
         locationMatchScore: 1.0,
         contentMatchScore: 1.0,
+        searchRelevance,
+        hasApplicationForm,
+        hasApplyButton,
         sourceEvidence: {
           title: { value: detectedTitle || job.title, source: 'external_page', verified: true },
           company: { value: detectedCompany || job.company, source: 'external_page', verified: true },
-          location: { value: job.location, source: 'external_page', verified: true },
+          location: { value: locForCountry, source: 'external_page', verified: countryRes.isVerified },
           salary: job.salaryText ? { value: job.salaryText, source: 'external_page', verified: true } : undefined,
           visaSponsorship: job.visaSponsorship ? { value: job.visaSponsorship, source: 'external_page', verified: true } : undefined,
+          application: hasApplicationForm || hasApplyButton ? { value: hasApplicationForm ? 'form' : 'button', source: 'external_page', verified: true } : undefined,
         },
         verifiedAt: timestamp,
       };
@@ -593,25 +836,27 @@ export class JobVerificationService {
     job.locationMatchScore = result.locationMatchScore;
     job.contentMatchScore = result.contentMatchScore;
     job.jobIdentityReason = result.jobIdentityReason || result.reason;
-    job.sourceEvidence = result.sourceEvidence;
+    job.verifiedCountry = result.verifiedCountry;
+    job.countryVerified = result.countryVerified;
+    job.countrySource = result.countrySource;
+    job.countryMismatch = result.countryMismatch;
+    if (result.verifiedCountry && result.countryVerified) {
+      job.country = result.verifiedCountry as any;
+    }
+    job.searchRelevance = result.searchRelevance;
+    job.hasApplicationForm = result.hasApplicationForm;
+    job.hasApplyButton = result.hasApplyButton;
 
     if (result.status === JobLifecycleStatus.DEMO_ONLY) {
       job.isDemoJob = true;
       job.applyabilityStatus = 'EXPIRED';
-    } else if (result.status === JobLifecycleStatus.SOURCE_MISMATCH) {
+    } else if (result.status === JobLifecycleStatus.SOURCE_MISMATCH || result.status === JobLifecycleStatus.SEARCH_QUERY_MISMATCH) {
       job.sourceVerified = false;
       job.jobIdentityVerified = false;
       job.applyabilityStatus = 'UNVERIFIED';
     } else if (result.verified && result.status === JobLifecycleStatus.ACTIVE && job.jobIdentityVerified !== false) {
-      const urlLower = (job.canonicalUrl || job.url || '').toLowerCase();
-      const isDirectATS =
-        urlLower.includes('ashbyhq.com') ||
-        urlLower.includes('greenhouse.io') ||
-        urlLower.includes('lever.co') ||
-        urlLower.includes('workable.com') ||
-        urlLower.includes('/apply') ||
-        urlLower.includes('/jobs/');
-      job.applyabilityStatus = isDirectATS ? 'APPLY_NOW' : 'VIEW_ONLY';
+      const hasFormOrButton = result.hasApplicationForm || result.hasApplyButton;
+      job.applyabilityStatus = hasFormOrButton ? 'APPLY_NOW' : 'VIEW_ONLY';
     } else {
       job.applyabilityStatus = 'EXPIRED';
     }
@@ -706,6 +951,13 @@ export class JobVerificationService {
     }
 
     return { eligible: true };
+  }
+
+  /**
+   * Helper alias method for verifying a single job listing with searchQuery context.
+   */
+  public async verifyJobListing(job: JobListing, searchQuery?: string): Promise<ExternalJobVerificationResult> {
+    return this.verifyExternalJob(job, searchQuery);
   }
 
   /**

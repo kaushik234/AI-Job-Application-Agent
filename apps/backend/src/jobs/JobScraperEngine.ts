@@ -218,53 +218,12 @@ export class JobScraperEngine {
     });
     logger.info('SEARCH', `[JOB_SCRAPE] Total raw jobs: ${rawJobs.length}`);
 
-    // Apply strict visaOnly, remoteOnly & country filtering to raw scraped jobs
-    let filteredScrapedJobs = rawJobs;
-    if (!isWorldwide && query.countries && query.countries.length > 0) {
-      const initialCount = filteredScrapedJobs.length;
-      filteredScrapedJobs = filteredScrapedJobs.filter((j) => query.countries!.includes(j.country));
-      const removedByCountry = initialCount - filteredScrapedJobs.length;
-      if (removedByCountry > 0) {
-        logger.info('SEARCH', `[JOB_SCRAPE] Filtered ${removedByCountry} jobs because country mismatch (allowed: ${query.countries.join(', ')})`);
-      }
-    }
-    if (visaOnly) {
-      const initialCount = filteredScrapedJobs.length;
-      filteredScrapedJobs = filteredScrapedJobs.filter((j) => j.visaSponsorship === true);
-      const visaFilteredCount = initialCount - filteredScrapedJobs.length;
-      if (visaFilteredCount > 0) {
-        logger.info('SEARCH', `[JOB_SCRAPE] Filtered ${visaFilteredCount} jobs because visaSponsorship=false`);
-      }
-    }
-    if (remoteOnly) {
-      const initialCount = filteredScrapedJobs.length;
-      filteredScrapedJobs = filteredScrapedJobs.filter((j) => j.isRemote === true);
-      const remoteFilteredCount = initialCount - filteredScrapedJobs.length;
-      if (remoteFilteredCount > 0) {
-        logger.info('SEARCH', `[JOB_SCRAPE] Filtered ${remoteFilteredCount} jobs because remoteOnly=false`);
-      }
-    }
-
-    logger.info('SEARCH', `[JOB_SCRAPE] After normalization: ${filteredScrapedJobs.length}`);
-
-    if (filteredScrapedJobs.length === 0) {
-      return {
-        mode,
-        totalScrapedRaw: rawJobs.length,
-        totalUniqueNew: 0,
-        duplicatesFiltered: 0,
-        providersProcessed: this.providers.length,
-        providerBreakdown,
-        jobs: [],
-      };
-    }
-
     // 5. Deduplicate across platforms for current scrape
     const { jobDeduplicationService } = require('../services/JobDeduplicationService');
-    const deduplicated = jobDeduplicationService.deduplicateJobs(filteredScrapedJobs);
-    const duplicatesRemovedCount = filteredScrapedJobs.length - deduplicated.length;
+    const deduplicated = jobDeduplicationService.deduplicateJobs(rawJobs);
+    const duplicatesRemovedCount = rawJobs.length - deduplicated.length;
 
-    // 6. Verify that every deduplicated job is still live and accessible
+    // 6. External verification of every deduplicated job
     logger.info(
       'SEARCH',
       `[JOB_VERIFICATION] Verifying ${deduplicated.length} deduplicated jobs before ranking/saving`
@@ -272,9 +231,10 @@ export class JobScraperEngine {
 
     const rejectionStats: Record<string, number> = {
       SOURCE_MISMATCH: 0,
+      SEARCH_QUERY_MISMATCH: 0,
+      COUNTRY_MISMATCH: 0,
       EXPIRED: 0,
       INVALID_URL: 0,
-      COUNTRY_MISMATCH: 0,
       TITLE_MISMATCH: 0,
       COMPANY_MISMATCH: 0,
       NOT_APPLYABLE: 0,
@@ -282,18 +242,18 @@ export class JobScraperEngine {
       OTHER: 0,
     };
 
-    const verifiedJobs: JobListing[] = [];
+    const verifiedActiveJobs: JobListing[] = [];
 
     for (const job of deduplicated) {
       try {
-        const verifiedJob = await jobVerificationService.verifyJobListing(job);
+        const verifiedJob = await jobVerificationService.verifyJobListing(job, query.q || query.userQuery);
 
         if (
           verifiedJob.sourceVerified === true &&
           verifiedJob.verificationStatus === 'ACTIVE' &&
           verifiedJob.jobIdentityVerified !== false
         ) {
-          verifiedJobs.push(verifiedJob);
+          verifiedActiveJobs.push(verifiedJob);
         } else {
           const statusKey = String(verifiedJob.verificationStatus || 'OTHER');
           if (statusKey in rejectionStats) {
@@ -315,24 +275,51 @@ export class JobScraperEngine {
       }
     }
 
-    console.log('[SCRAPE_TRACE] [3] VERIFICATION', {
+    // 7. Post-verification Country Filter (Phase 7)
+    let countryFilteredJobs = verifiedActiveJobs;
+    if (!isWorldwide && query.countries && query.countries.length > 0) {
+      const allowedCountries = query.countries;
+      countryFilteredJobs = verifiedActiveJobs.filter((j) => {
+        const match = allowedCountries.includes(j.country as any) || (j.verifiedCountry && allowedCountries.includes(j.verifiedCountry as any));
+        if (!match) {
+          rejectionStats.COUNTRY_MISMATCH++;
+          logger.info('SEARCH', `[COUNTRY_FILTER] Excluded ${j.company} - ${j.title} (Location: ${j.location}, Verified Country: ${j.country}) because not in allowed countries [${allowedCountries.join(', ')}]`);
+        }
+        return match;
+      });
+    }
+
+    // 8. Search Query Relevance Filter (Phase 1)
+    let searchRelevantJobs = countryFilteredJobs;
+    const userSearchTerm = (query.q || query.userQuery || '').trim();
+    if (userSearchTerm && userSearchTerm !== 'ALL' && userSearchTerm !== 'WORLDWIDE') {
+      searchRelevantJobs = countryFilteredJobs.filter((j) => {
+        const rel = jobVerificationService.verifySearchQueryRelevance(j, userSearchTerm, j.detectedTitle || j.title, j.description);
+        j.searchRelevance = rel;
+        if (!rel.searchRelevanceVerified) {
+          rejectionStats.SEARCH_QUERY_MISMATCH++;
+          logger.info('SEARCH', `[SEARCH_RELEVANCE] Excluded ${j.company} - ${j.title}: ${rel.searchRelevanceReason}`);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    console.log('[SCRAPE_TRACE] [3] VERIFICATION & RELEVANCE', {
       stage: 'VERIFICATION',
       rawCount: rawJobs.length,
       deduplicatedCount: deduplicated.length,
-      verifiedCount: verifiedJobs.length,
+      verifiedActiveCount: verifiedActiveJobs.length,
+      countryFilteredCount: countryFilteredJobs.length,
+      searchRelevantCount: searchRelevantJobs.length,
       rejectionStats,
-      jobIds: verifiedJobs.map((j) => j.id),
+      jobIds: searchRelevantJobs.map((j) => j.id),
     });
 
-    logger.info(
-      'SEARCH',
-      `[JOB_VERIFICATION] Active jobs: ${verifiedJobs.length}/${deduplicated.length}`
-    );
-
-    // 7. Filter verified jobs by actual career/role relevance
+    // 9. Filter verified + relevant jobs by candidate role relevance
     const roleRelevantJobs: JobListing[] = [];
 
-    for (const job of verifiedJobs) {
+    for (const job of searchRelevantJobs) {
       const relevant = isRoleRelevant(job, masterResume);
 
       if (relevant) {
@@ -348,10 +335,10 @@ export class JobScraperEngine {
 
     logger.info(
       'SEARCH',
-      `[JOB_RELEVANCE] Relevant jobs: ${roleRelevantJobs.length}/${verifiedJobs.length}`,
+      `[JOB_RELEVANCE] Relevant jobs: ${roleRelevantJobs.length}/${searchRelevantJobs.length}`,
     );
 
-    // 8. Calculate candidate ranking only for verified + relevant jobs
+    // 10. Calculate candidate ranking only for verified + search-relevant + role-relevant jobs
     const scoredRawJobs = jobRankingService.rankJobs(
       roleRelevantJobs,
       masterResume,
@@ -360,7 +347,7 @@ export class JobScraperEngine {
     console.log('[SCRAPE_TRACE] [4] RANKING', {
       stage: 'RANKING',
       jobsCount: scoredRawJobs.length,
-      verifiedCount: verifiedJobs.length,
+      verifiedCount: verifiedActiveJobs.length,
       finalCount: scoredRawJobs.length,
       jobIds: scoredRawJobs.map((j) => j.id),
     });
@@ -386,8 +373,8 @@ export class JobScraperEngine {
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
     logger.info('SEARCH', `[JOB_DEDUP] After deduplication: ${deduplicated.length}`);
-    logger.info('SEARCH', `[VERIFICATION] active=${verifiedJobs.length}/${deduplicated.length}`);
-    logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${verifiedJobs.length}`);
+    logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${deduplicated.length}`);
+    logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${searchRelevantJobs.length}`);
     logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
     logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length}`);
 

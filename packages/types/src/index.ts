@@ -298,6 +298,8 @@ export enum JobLifecycleStatus {
   REMOVED = 'REMOVED',
   INVALID_URL = 'INVALID_URL',
   SOURCE_MISMATCH = 'SOURCE_MISMATCH',
+  SEARCH_QUERY_MISMATCH = 'SEARCH_QUERY_MISMATCH',
+  COUNTRY_MISMATCH = 'COUNTRY_MISMATCH',
   DEMO_ONLY = 'DEMO_ONLY'
 }
 
@@ -314,6 +316,14 @@ export interface JobSourceEvidenceMap {
   salary?: FieldSourceEvidence;
   visaSponsorship?: FieldSourceEvidence;
   postedDate?: FieldSourceEvidence;
+  application?: FieldSourceEvidence;
+}
+
+export interface SearchQueryRelevanceResult {
+  searchRelevanceVerified: boolean;
+  searchRelevanceScore: number;
+  searchRelevanceReason: string;
+  searchQuery: string;
 }
 
 export interface ExternalJobVerificationResult {
@@ -325,6 +335,10 @@ export interface ExternalJobVerificationResult {
   detectedTitle?: string;
   detectedCompany?: string;
   detectedLocation?: string;
+  verifiedCountry?: string;
+  countryVerified?: boolean;
+  countrySource?: string;
+  countryMismatch?: boolean;
   jobIdentityVerified?: boolean;
   titleMatchScore?: number;
   companyMatchScore?: number;
@@ -332,6 +346,9 @@ export interface ExternalJobVerificationResult {
   contentMatchScore?: number;
   jobIdentityReason?: string;
   sourceEvidence?: JobSourceEvidenceMap;
+  searchRelevance?: SearchQueryRelevanceResult;
+  hasApplicationForm?: boolean;
+  hasApplyButton?: boolean;
   verifiedAt: string;
 }
 
@@ -387,6 +404,13 @@ export interface JobListing {
   sourceEvidence?: JobSourceEvidenceMap;
   detectedTitle?: string;
   detectedCompany?: string;
+  verifiedCountry?: string;
+  countryVerified?: boolean;
+  countrySource?: string;
+  countryMismatch?: boolean;
+  searchRelevance?: SearchQueryRelevanceResult;
+  hasApplicationForm?: boolean;
+  hasApplyButton?: boolean;
   isDemoJob?: boolean;
   matchScore?: number;
   applicationPriority?: PriorityLevel | number;
