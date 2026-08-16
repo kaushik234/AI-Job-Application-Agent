@@ -10,6 +10,7 @@ import {
   BaseJobProvider,
   JobSearchQuery,
   PaginationOptions,
+  PaginatedJobResults,
   GreenhouseProvider,
   LeverProvider,
   AshbyProvider,
@@ -39,8 +40,16 @@ export interface SearchEngineCrawlReport {
   totalUniqueNew: number;
   duplicatesFiltered: number;
   providersProcessed: number;
-  providerBreakdown: Record<string, { scraped: number; status: string; message?: string }>;
-  rejectionStats?: Record<string, number>;
+  providerBreakdown: Record<
+    string,
+    {
+      scraped: number;
+      status: string;
+      message?: string;
+      diagnostics?: Record<string, any>;
+    }
+  >;
+  rejectionStats: Record<string, number>;
   jobs: JobListing[];
 }
 
@@ -107,7 +116,7 @@ export class JobScraperEngine {
     logger.info('SEARCH', `[SCRAPE_START] candidate=${candidateName}`);
     logger.info('SEARCH', `[SCRAPE_QUERY] query=${derived.userQuery || 'All'} countries=${countriesLogStr} visaOnly=${visaOnly} remoteOnly=${remoteOnly}`);
 
-    const providerBreakdown: Record<string, { scraped: number; status: string; message?: string }> = {};
+    const providerBreakdown: Record<string, { scraped: number; status: string; message?: string; diagnostics?: Record<string, any> }> = {};
 
     const pageLimit = pagination.limit || 50;
     const targetCollectionLimit = pagination.targetLimit || 150;
@@ -133,6 +142,7 @@ export class JobScraperEngine {
         logger.info('SEARCH', `[PROVIDER_START] provider=${provider.platform}`);
         const providerJobs: JobListing[] = [];
         const seenIds = new Set<string>();
+        let lastResult: PaginatedJobResults | null = null;
 
         for (const subQuery of activeSubQueries) {
           if (controller.signal.aborted) break;
@@ -159,6 +169,7 @@ export class JobScraperEngine {
               limit: pageLimit,
               signal: controller.signal,
             });
+            lastResult = result;
             pagesFetched++;
 
             if (!result || !result.jobs || result.jobs.length === 0) {
@@ -188,14 +199,32 @@ export class JobScraperEngine {
 
         clearTimeout(timeoutId);
 
-        const outcome = providerJobs.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
+        let outcome = lastResult?.outcomeStatus || (providerJobs.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS');
+        if (providerJobs.length > 0 && outcome === 'SUCCESS_ZERO_RESULTS') {
+          outcome = 'SUCCESS_WITH_RESULTS';
+        }
+
+        const diagnostics = lastResult?.diagnostics || {
+          query: activeSubQueries.join(', '),
+          rawJobs: providerJobs.length,
+        };
+
+        logger.info(
+          'SEARCH',
+          `[PROVIDER_TRACE]\nprovider=${provider.platform}\nquery="${activeSubQueries.join(', ')}"\nrawJobs=${providerJobs.length}\nstatus=${outcome}\nmessage=${lastResult?.message || ''}`
+        );
 
         logger.info(
           'SEARCH',
           `[DISCOVERY_RESPONSE] provider=${provider.platform} count=${providerJobs.length} outcome=${outcome}`
         );
 
-        providerBreakdown[provider.platform] = { scraped: providerJobs.length, status: outcome };
+        providerBreakdown[provider.platform] = {
+          scraped: providerJobs.length,
+          status: outcome,
+          message: lastResult?.message,
+          diagnostics,
+        };
         return providerJobs;
       } catch (err: any) {
         clearTimeout(timeoutId);
@@ -210,7 +239,12 @@ export class JobScraperEngine {
           outcome = 'PARSER_FAILED';
         }
         logger.warn('SEARCH', `[PROVIDER_ERROR] provider=${provider.platform} outcome=${outcome} error=${errMessage}`);
-        providerBreakdown[provider.platform] = { scraped: 0, status: outcome, message: errMessage };
+        providerBreakdown[provider.platform] = {
+          scraped: 0,
+          status: outcome,
+          message: errMessage,
+          diagnostics: { query: activeSubQueries.join(', '), error: errMessage },
+        };
         return [] as JobListing[];
       }
     });

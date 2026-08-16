@@ -4,7 +4,7 @@
  * @architect Clean Architecture - Job Bank Canada Integration
  */
 
-import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
+import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults, ProviderOutcomeStatus } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 
 import { logger } from '@sentinel/shared';
@@ -82,11 +82,12 @@ export class JobBankCanadaProvider extends BaseJobProvider {
       }
 
       const paginatedSlice = filtered.slice(offset, offset + limit);
+      const outcomeStatus: ProviderOutcomeStatus = paginatedSlice.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
 
       const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
       logger.info(
         'SEARCH',
-        `[JOB_SOURCE] Provider: Job Bank Canada | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length}`
+        `[JOB_SOURCE] Provider: Job Bank Canada | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length} | Outcome: ${outcomeStatus}`
       );
       logger.info(
         'SEARCH',
@@ -99,6 +100,12 @@ export class JobBankCanadaProvider extends BaseJobProvider {
         page,
         limit,
         jobs: paginatedSlice,
+        outcomeStatus,
+        diagnostics: {
+          query: query.q || query.userQuery || query.keywords?.join(', '),
+          rawJobsBeforeQueryFilter: rawJobBankPostings.length,
+          rawJobsAfterQueryFilter: filtered.length,
+        },
       };
     });
   }

@@ -4,7 +4,7 @@
  * @architect Clean Architecture - Career Pages Crawler Integration
  */
 
-import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
+import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults, ProviderOutcomeStatus } from './BaseJobProvider';
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 
 import { logger } from '@sentinel/shared';
@@ -33,6 +33,11 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
           limit,
           jobs: [],
           outcomeStatus: 'SUCCESS_ZERO_RESULTS',
+          message: 'Direct career pages require explicit company target URL',
+          diagnostics: {
+            query: query.q || query.userQuery || query.keywords?.join(', '),
+            message: 'Direct career pages require explicit company target URL',
+          },
         };
       }
 
@@ -90,11 +95,12 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
       }
 
       const paginatedSlice = filtered.slice(offset, offset + limit);
+      const outcomeStatus: ProviderOutcomeStatus = paginatedSlice.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
 
       const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
       logger.info(
         'SEARCH',
-        `[JOB_SOURCE] Provider: Company Career Page | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length}`
+        `[JOB_SOURCE] Provider: Company Career Page | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${filtered.length} | Outcome: ${outcomeStatus}`
       );
       logger.info(
         'SEARCH',
@@ -107,6 +113,12 @@ export class CompanyCareerPagesProvider extends BaseJobProvider {
         page,
         limit,
         jobs: paginatedSlice,
+        outcomeStatus,
+        diagnostics: {
+          query: query.q || query.userQuery || query.keywords?.join(', '),
+          rawJobsBeforeQueryFilter: rawCareerPostings.length,
+          rawJobsAfterQueryFilter: filtered.length,
+        },
       };
     });
   }

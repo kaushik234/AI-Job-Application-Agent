@@ -1002,3 +1002,36 @@ export interface CoverLetterRollbackResult {
   coverLetter: CoverLetter;
   message: string;
 }
+
+export type ProviderOutcomeStatus =
+  | 'SUCCESS_WITH_RESULTS'
+  | 'SUCCESS_ZERO_RESULTS'
+  | 'PARTIAL_RESULTS'
+  | 'AUTH_REQUIRED'
+  | 'TIMEOUT'
+  | 'NETWORK_ERROR'
+  | 'RATE_LIMITED'
+  | 'HTTP_ERROR'
+  | 'PARSER_FAILED'
+  | 'UNSUPPORTED'
+  | 'PROVIDER_ERROR';
+
+export interface ProviderDiagnostics {
+  query?: string;
+  boardsAttempted?: number;
+  boardsSucceeded?: number;
+  boardsFailed?: number;
+  boardsTimedOut?: number;
+  boardsRateLimited?: number;
+  rawJobsBeforeQueryFilter?: number;
+  rawJobsAfterQueryFilter?: number;
+  message?: string;
+  [key: string]: any;
+}
+
+export interface JobPlatformBreakdown {
+  scraped: number;
+  status: ProviderOutcomeStatus | string;
+  message?: string;
+  diagnostics?: ProviderDiagnostics;
+}

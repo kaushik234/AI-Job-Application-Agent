@@ -28,14 +28,17 @@ export interface PaginationOptions {
 export type ProviderOutcomeStatus =
   | 'SUCCESS_WITH_RESULTS'
   | 'SUCCESS_ZERO_RESULTS'
+  | 'PARTIAL_RESULTS'
   | 'BLOCKED'
   | 'RATE_LIMITED'
   | 'AUTH_REQUIRED'
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
+  | 'HTTP_ERROR'
   | 'PARSER_FAILED'
   | 'SOURCE_CHANGED'
-  | 'UNSUPPORTED';
+  | 'UNSUPPORTED'
+  | 'PROVIDER_ERROR';
 
 export type ProviderFailureStage =
   | 'REQUEST'
@@ -86,6 +89,7 @@ export interface PaginatedJobResults {
   failureStage?: ProviderFailureStage;
   message?: string;
   telemetry?: ProviderTelemetry;
+  diagnostics?: Record<string, any>;
 }
 
 export interface JobDiscoveryProvider {

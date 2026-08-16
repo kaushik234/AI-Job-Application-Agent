@@ -4,7 +4,7 @@
  * @architect Clean Architecture - Seek Platform Integration
  */
 
-import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
+import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults, ProviderOutcomeStatus } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
 import { normalizePostingDate } from '../utils/dateNormalizer';
@@ -38,6 +38,10 @@ export class SeekProvider extends BaseJobProvider {
           jobs: [],
           outcomeStatus: 'AUTH_REQUIRED',
           message: 'Missing SEEK_API_KEY environment variable. Seek portal requires API credentials or licensed access endpoint.',
+          diagnostics: {
+            query: query.q || query.userQuery || query.keywords?.join(', '),
+            authState: 'MISSING_API_KEY',
+          },
         };
       }
 
@@ -71,11 +75,12 @@ export class SeekProvider extends BaseJobProvider {
       }
 
       const paginatedSlice = sample.slice(offset, offset + limit);
+      const outcomeStatus: ProviderOutcomeStatus = paginatedSlice.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
 
       const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
       logger.info(
         'SEARCH',
-        `[JOB_SOURCE] Provider: Seek | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${sample.length}`
+        `[JOB_SOURCE] Provider: Seek | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${sample.length} | Outcome: ${outcomeStatus}`
       );
       logger.info(
         'SEARCH',
@@ -88,6 +93,11 @@ export class SeekProvider extends BaseJobProvider {
         page,
         limit,
         jobs: paginatedSlice,
+        outcomeStatus,
+        diagnostics: {
+          query: query.q || query.userQuery || query.keywords?.join(', '),
+          rawJobs: sample.length,
+        },
       };
     });
   }

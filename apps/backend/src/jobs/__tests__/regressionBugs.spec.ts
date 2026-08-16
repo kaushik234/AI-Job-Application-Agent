@@ -267,4 +267,104 @@ describe('Regression Suite for Job Discovery & Candidate Relevance Bugs (Bugs 1-
       expect(type).toBe('Unknown');
     });
   });
+
+  describe('Provider Outcome Statuses & Telemetry (Section 13)', () => {
+    test('1. Successful provider request with zero matching jobs => SUCCESS_ZERO_RESULTS', async () => {
+      const ashby = new (require('../providers/AshbyProvider').AshbyProvider)();
+      const mockFetch = jest.spyOn(global, 'fetch').mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ jobs: [] }),
+        } as any)
+      );
+      const res = await ashby.search({ keywords: ['nonexistent_tech_xyz_999'] });
+      mockFetch.mockRestore();
+
+      expect(res.outcomeStatus).toBe('SUCCESS_ZERO_RESULTS');
+      expect(res.diagnostics).toBeDefined();
+      expect(res.diagnostics?.rawJobsAfterQueryFilter).toBe(0);
+    });
+
+    test('2 & 8. All Ashby boards fail => status NOT SUCCESS_ZERO_RESULTS', async () => {
+      const ashby = new (require('../providers/AshbyProvider').AshbyProvider)();
+      const mockFetch = jest.spyOn(global, 'fetch').mockImplementation(() => Promise.reject(new Error('Network error')));
+      const res = await ashby.search({ keywords: ['flutter'] });
+      mockFetch.mockRestore();
+
+      expect(res.outcomeStatus).not.toBe('SUCCESS_ZERO_RESULTS');
+      expect(res.outcomeStatus).toBe('NETWORK_ERROR');
+      expect(res.diagnostics?.boardsSucceeded).toBe(0);
+    });
+
+    test('3. Provider timeout => TIMEOUT', async () => {
+      const ashby = new (require('../providers/AshbyProvider').AshbyProvider)();
+      const mockFetch = jest.spyOn(global, 'fetch').mockImplementation(() => {
+        const err: any = new Error('Timeout');
+        err.name = 'AbortError';
+        return Promise.reject(err);
+      });
+      const res = await ashby.search({ keywords: ['flutter'] });
+      mockFetch.mockRestore();
+
+      expect(res.outcomeStatus).toBe('TIMEOUT');
+      expect(res.diagnostics?.boardsTimedOut).toBeGreaterThan(0);
+    });
+
+    test('4. HTTP 429 => RATE_LIMITED in diagnostics', async () => {
+      const ashby = new (require('../providers/AshbyProvider').AshbyProvider)();
+      const mockFetch = jest.spyOn(global, 'fetch').mockImplementation(() =>
+        Promise.resolve({
+          ok: false,
+          status: 429,
+          json: () => Promise.resolve({}),
+        } as any)
+      );
+      const res = await ashby.search({ keywords: ['flutter'] });
+      mockFetch.mockRestore();
+
+      expect(res.outcomeStatus).not.toBe('SUCCESS_ZERO_RESULTS');
+      expect(res.diagnostics?.boardsRateLimited).toBeGreaterThan(0);
+    });
+
+    test('7. Partial Ashby board failure => successful jobs preserved as PARTIAL_RESULTS', async () => {
+      const ashby = new (require('../providers/AshbyProvider').AshbyProvider)();
+      let callCount = 0;
+      const mockFetch = jest.spyOn(global, 'fetch').mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({
+                jobs: [
+                  {
+                    id: 'flutter-job-1',
+                    title: 'Flutter Developer',
+                    locationName: 'Sydney, Australia',
+                    descriptionHtml: 'Flutter app.',
+                    publishedAt: '2026-08-01',
+                  },
+                ],
+              }),
+          } as any);
+        }
+        return Promise.reject(new Error('Network error'));
+      });
+
+      const res = await ashby.search({ keywords: ['flutter'] });
+      mockFetch.mockRestore();
+
+      expect(res.jobs.length).toBe(1);
+      expect(res.outcomeStatus).toBe('PARTIAL_RESULTS');
+      expect(res.diagnostics?.boardsSucceeded).toBe(1);
+    });
+
+    test('9 & 10. Explicit query "flutter" preserves userQuery', () => {
+      const derived = deriveSearchQueriesFromResume(flutterResume, 'flutter');
+      expect(derived.userQuery).toBe('flutter');
+      expect(derived.keywords).toEqual(['flutter']);
+    });
+  });
 });
