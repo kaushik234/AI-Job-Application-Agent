@@ -88,6 +88,16 @@ export class DiscoveryJobStore {
   }
 
   /**
+   * Get all active transient jobs for a given discoveryRunId
+   */
+  public getRunSnapshot(discoveryRunId: string): JobListing[] {
+    this.clearExpired();
+    return Array.from(this.store.values())
+      .filter((e) => e.discoveryRunId === discoveryRunId)
+      .map((e) => e.job);
+  }
+
+  /**
    * Get all active transient jobs
    */
   public getAllTransientJobs(): JobListing[] {

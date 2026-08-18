@@ -87,15 +87,19 @@ export class JobService {
         const countriesRes = countries.map((c) => String(c));
         console.log(`[DISCOVERY] runId=${discoveryRunId} query="${userQueryStr}" countries="${countriesRes.join(',')}"`);
 
-        const report = await this.scraper.executeParallelCrawl({
-          q: userQueryStr || undefined,
-          userQuery: userQueryStr || undefined,
-          countries,
-          visaOnly: dto.visaOnly,
-          remoteOnly: dto.remoteOnly,
-          minSalary: dto.minSalary,
-          keywords: dto.keywords,
-        });
+        const report = await this.scraper.executeParallelCrawl(
+          {
+            q: userQueryStr || undefined,
+            userQuery: userQueryStr || undefined,
+            countries,
+            visaOnly: dto.visaOnly,
+            remoteOnly: dto.remoteOnly,
+            minSalary: dto.minSalary,
+            keywords: dto.keywords,
+          },
+          { page: dto.page || 1, limit: dto.limit || 20 },
+          discoveryRunId
+        );
 
         if (report.providerBreakdown) {
           Object.entries(report.providerBreakdown).forEach(([providerName, details]: any) => {

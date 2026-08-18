@@ -16,7 +16,7 @@ export class JobVerificationService {
    * Centralized verification entrypoint.
    * Performs deep content inspection and source-specific pattern matching.
    */
-  public async verifyExternalJob(job: JobListing, searchQuery?: string): Promise<ExternalJobVerificationResult> {
+  public async verifyExternalJob(job: JobListing, searchQuery?: string, options?: { persist?: boolean }): Promise<ExternalJobVerificationResult> {
     const timestamp = new Date().toISOString();
     const targetUrl = job.url || job.originalUrl;
     const jobIdLower = (job.id || '').toLowerCase();
@@ -41,7 +41,7 @@ export class JobVerificationService {
         verifiedAt: timestamp,
         finalUrl: targetUrl,
       };
-      await this.updateJobRecord(job, result);
+      await this.updateJobRecord(job, result, options);
       return result;
     }
 
@@ -54,7 +54,7 @@ export class JobVerificationService {
         verifiedAt: timestamp,
         finalUrl: targetUrl,
       };
-      await this.updateJobRecord(job, result);
+      await this.updateJobRecord(job, result, options);
       return result;
     }
 
@@ -69,7 +69,7 @@ export class JobVerificationService {
           finalUrl: targetUrl,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.includes('greenhouse.io') && (urlLower.includes('error=true') || urlLower.includes('canva-expired') || urlLower.includes('error-job'))) {
@@ -81,7 +81,7 @@ export class JobVerificationService {
           finalUrl: `${targetUrl}?error=true`,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.includes('workable.com') && (urlLower.includes('not_found=true') || urlLower.includes('zendesk-expired') || urlLower.includes('error-job'))) {
@@ -93,7 +93,7 @@ export class JobVerificationService {
           finalUrl: `${targetUrl}?not_found=true`,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.includes('sap.com') && (urlLower.includes('errorpage') || urlLower.includes('errortype=404') || urlLower.includes('sap-error') || urlLower.includes('sap-expired'))) {
@@ -105,7 +105,7 @@ export class JobVerificationService {
           finalUrl: targetUrl,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.includes('seek-invalid-redirect') || urlLower.endsWith('/jobs') || urlLower.endsWith('/jobs/')) {
@@ -117,7 +117,7 @@ export class JobVerificationService {
           finalUrl: targetUrl,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.endsWith('/careers') || urlLower.endsWith('/careers/') || urlLower.includes('generic-redirect')) {
@@ -129,7 +129,7 @@ export class JobVerificationService {
           finalUrl: targetUrl,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       if (urlLower.includes('generic-200-error') || urlLower.includes('closed-job') || urlLower.includes('expired-job')) {
@@ -141,7 +141,7 @@ export class JobVerificationService {
           finalUrl: targetUrl,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
       // Active test mock provider URLs
@@ -182,7 +182,7 @@ export class JobVerificationService {
           hasApplyButton: true,
           verifiedAt: timestamp,
         };
-        await this.updateJobRecord(job, res);
+        await this.updateJobRecord(job, res, options);
         return res;
       }
     }
@@ -205,7 +205,7 @@ export class JobVerificationService {
 
       // Run Platform-Specific Validators
       const platformResult = this.runPlatformSpecificValidators(job, targetUrl, finalUrl, html, httpStatus, timestamp, searchQuery);
-      await this.updateJobRecord(job, platformResult);
+      await this.updateJobRecord(job, platformResult, options);
       return platformResult;
     } catch (err: any) {
       const result: ExternalJobVerificationResult = {
@@ -215,7 +215,7 @@ export class JobVerificationService {
         verifiedAt: timestamp,
         finalUrl: targetUrl,
       };
-      await this.updateJobRecord(job, result);
+      await this.updateJobRecord(job, result, options);
       return result;
     }
   }
@@ -296,55 +296,75 @@ export class JobVerificationService {
     const descToUse = (verifiedDescription || job.description || '').toLowerCase();
     const fullText = `${titleToUse} ${job.company.toLowerCase()} ${descToUse}`;
 
-    // Target technology keyword extraction
-    const techKeywords = ['flutter', 'react', 'python', 'golang', 'node', 'ios', 'android', 'swift', 'kotlin', 'c++', 'rust', 'java'];
-    const targetTechs = techKeywords.filter((t) => rawQuery.includes(t));
+    // Target technology keyword extraction & Multi-Tech AND Semantics
+    const techAliasMap: Record<string, string[]> = {
+      flutter: ['flutter', 'dart'],
+      react: ['react', 'react native', 'reactjs'],
+      android: ['android', 'kotlin'],
+      ios: ['ios', 'swift', 'objective-c'],
+      python: ['python', 'py'],
+      golang: ['golang', 'go'],
+      node: ['node', 'nodejs', 'express'],
+      swift: ['swift'],
+      kotlin: ['kotlin'],
+      'c++': ['c++', 'cpp'],
+      rust: ['rust'],
+      java: ['java'],
+    };
 
-    if (targetTechs.length > 0) {
-      for (const tech of targetTechs) {
-        // Direct title match (e.g. "Flutter Developer", "Senior Flutter Engineer")
-        if (titleToUse.includes(tech)) {
-          return {
-            searchRelevanceVerified: true,
-            searchRelevanceScore: 1.0,
-            searchRelevanceReason: `Verified job title explicitly contains target search technology (${tech}).`,
-            searchQuery: rawQuery,
-          };
-        }
+    const knownTechKeys = Object.keys(techAliasMap);
+    const queryTokens = rawQuery.split(/\s+/);
+    const requestedTechs = knownTechKeys.filter((tech) => queryTokens.includes(tech) || rawQuery.includes(tech));
 
-        // Check if verified description or full content explicitly contains target technology or closely related technology
-        const relatedTechs: Record<string, string[]> = {
-          flutter: ['flutter', 'dart'],
-          ios: ['ios', 'swift'],
-          android: ['android', 'kotlin'],
-          react: ['react', 'react native'],
+    if (requestedTechs.length > 0) {
+      // Direct single-technology title match (e.g. "Flutter Developer", "Senior Flutter Engineer")
+      if (requestedTechs.length === 1 && titleToUse.includes(requestedTechs[0])) {
+        return {
+          searchRelevanceVerified: true,
+          searchRelevanceScore: 1.0,
+          searchRelevanceReason: `Verified job title explicitly contains target search technology (${requestedTechs[0]}).`,
+          searchQuery: rawQuery,
         };
+      }
 
-        const checkTerms = relatedTechs[tech] || [tech];
-        const hasTechInDesc = checkTerms.some((term) => descToUse.includes(term));
+      // MULTI-TECH AND SEMANTICS:
+      // Every requested technology group MUST be satisfied by verified title or job-specific description.
+      // Each technology group is satisfied if ANY of its aliases (OR group) matches in job content.
+      const missingTechGroups: string[] = [];
 
-        if (hasTechInDesc) {
-          return {
-            searchRelevanceVerified: true,
-            searchRelevanceScore: 0.85,
-            searchRelevanceReason: `Verified job description explicitly requires target search technology (${tech}).`,
-            searchQuery: rawQuery,
-          };
+      for (const tech of requestedTechs) {
+        const aliases = techAliasMap[tech] || [tech];
+        const groupMatched = aliases.some((alias) => {
+          const aLower = alias.toLowerCase();
+          return titleToUse.includes(aLower) || descToUse.includes(aLower);
+        });
+
+        if (!groupMatched) {
+          missingTechGroups.push(tech);
         }
+      }
 
-        // Otherwise reject generic roles lacking target tech in verified title and description
+      if (missingTechGroups.length === 0) {
+        const isTitleMatch = requestedTechs.some((t) => titleToUse.includes(t));
+        return {
+          searchRelevanceVerified: true,
+          searchRelevanceScore: isTitleMatch ? 1.0 : 0.85,
+          searchRelevanceReason: `Verified job content satisfies requested technology requirement(s) [${requestedTechs.join(' AND ')}].`,
+          searchQuery: rawQuery,
+        };
+      } else {
         return {
           searchRelevanceVerified: false,
           searchRelevanceScore: 0.10,
-          searchRelevanceReason: `Target search query "${rawQuery}" missing from verified job title ("${verifiedTitle || job.title}") and verified job content.`,
+          searchRelevanceReason: `Target search query "${rawQuery}" missing requested technology requirement(s): [${missingTechGroups.join(', ')}] in verified title/description.`,
           searchQuery: rawQuery,
         };
       }
     }
 
     // Tokenized query matching for general searches
-    const queryTokens = rawQuery.split(/\s+/).filter((t) => t.length > 2);
-    const matchesAllTokens = queryTokens.every((token) => {
+    const queryWords = rawQuery.split(/\s+/).filter((t) => t.length > 2);
+    const matchesAllTokens = queryWords.every((token) => {
       if (fullText.includes(token)) return true;
       if (token === 'developer' || token === 'engineer' || token === 'programmer') {
         return fullText.includes('engineer') || fullText.includes('developer') || fullText.includes('programmer');
@@ -822,7 +842,7 @@ export class JobVerificationService {
   /**
    * Saves verification result onto stored job model in database.
    */
-  private async updateJobRecord(job: JobListing, result: ExternalJobVerificationResult): Promise<JobListing> {
+  private async updateJobRecord(job: JobListing, result: ExternalJobVerificationResult, options?: { persist?: boolean }): Promise<JobListing> {
     console.log('[QUERY_VERIFICATION_TRACE]', JSON.stringify({
       candidateId: job.id,
       company: job.company,
@@ -888,9 +908,12 @@ export class JobVerificationService {
       job.applyabilityStatus = 'EXPIRED';
     }
 
-    // DISCOVERY / VERIFICATION != DATABASE WRITE
-    // During live discovery, verification mutates the in-memory JobListing model without writing to database.
-    logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Applyability: ${job.applyabilityStatus} | Verified: ${result.verified} (In-memory updated, 0 DB writes)`);
+    if (options?.persist === true) {
+      await db.saveJobs([job]);
+      logger.info('SEARCH', `[JOB_VERIFICATION] Saved DB record: ${job.company} (${job.title}) -> Status: ${result.status}`);
+    } else {
+      logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Applyability: ${job.applyabilityStatus} | Verified: ${result.verified} (In-memory updated, 0 DB writes)`);
+    }
     return job;
   }
 

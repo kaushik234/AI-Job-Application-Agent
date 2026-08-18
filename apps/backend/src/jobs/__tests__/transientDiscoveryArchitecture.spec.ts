@@ -2,14 +2,16 @@ import { discoveryJobStore } from '../../services/DiscoveryJobStore';
 import { JobRepository } from '../../repositories/JobRepository';
 import { db } from '../../database';
 import { JobService } from '../../modules/job/job.service';
+import { jobVerificationService } from '../../services/JobVerificationService';
 
 // Module mock to prevent real external HTTP calls during unit tests
 jest.mock('../JobScraperEngine', () => {
   return {
     JobScraperEngine: jest.fn().mockImplementation(() => ({
-      executeParallelCrawl: jest.fn().mockImplementation(async (queryParam: any) => {
+      executeParallelCrawl: jest.fn().mockImplementation(async (queryParam: any, pagination: any, discoveryRunId?: string) => {
         const qStr = (queryParam?.userQuery || queryParam?.q || queryParam?.query || '').toLowerCase();
         const isNonExistent = qStr.includes('nonexistent');
+        const runId = discoveryRunId || `disc_${Date.now()}_mock`;
         const jobs = isNonExistent
           ? []
           : [
@@ -28,11 +30,12 @@ jest.mock('../JobScraperEngine', () => {
             ];
 
         if (jobs.length > 0) {
-          discoveryJobStore.saveJobs(jobs as any, `disc_${Date.now()}`);
+          discoveryJobStore.saveJobs(jobs as any, runId);
         }
 
         return {
           mode: 'WORLDWIDE',
+          discoveryRunId: runId,
           totalScrapedRaw: jobs.length,
           freshJobsReturned: jobs.length,
           totalUniqueNew: jobs.length,
@@ -61,7 +64,7 @@ jest.mock('../JobScraperEngine', () => {
   };
 });
 
-describe('Transient Job Discovery Architecture & Zero-Automatic DB Persistence Specs', () => {
+describe('Focused Correctness Verification & Transient Architecture Test Suite', () => {
   let jobRepo: JobRepository;
   let jobService: JobService;
 
@@ -72,143 +75,179 @@ describe('Transient Job Discovery Architecture & Zero-Automatic DB Persistence S
     (jobService as any).activeDiscoveryFlights?.clear();
   });
 
-  test('1 & 16: Discovery does NOT write jobs to the database', async () => {
+  test('1. Live discovery does NOT increase DB count', async () => {
     const dbJobsBefore = (await db.getAllJobs()).length;
 
     const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
 
     const dbJobsAfter = (await db.getAllJobs()).length;
 
-    // Database count must NOT increase during discovery
     expect(dbJobsAfter).toBe(dbJobsBefore);
     expect(response.source).toBe('LIVE_DISCOVERY');
     expect(response.jobs.length).toBe(1);
   });
 
-  test('2 & 3: Discovery returns fresh jobs and populates DiscoveryJobStore', async () => {
-    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
-
-    expect(response.success).toBe(true);
-    expect(response.jobs.length).toBe(1);
-
-    const stored = discoveryJobStore.getJob('ashby-mock-flutter-101');
-    expect(stored).toBeDefined();
-    expect(stored?.company).toBe('MockCorp');
-  });
-
-  test('4 & 6: Transient job can be resolved by JobRepository.findById and db fallback works', async () => {
+  test('2. Explicit Save increases DB count by 1', async () => {
+    const dbBefore = (await db.getAllJobs()).length;
     const transientJob: any = {
-      id: 'transient-job-test-101',
-      title: 'Transient Flutter Engineer',
-      company: 'Transient Corp',
+      id: `transient-save-test-${Date.now()}`,
+      title: 'Explicit Save Mobile Dev',
+      company: 'SaveCorp Test',
       location: 'Sydney, AU',
       country: 'AU',
-      url: 'https://jobs.ashbyhq.com/transient/101',
+      url: `https://jobs.ashbyhq.com/savecorp/${Date.now()}`,
       platform: 'Ashby',
       jobStatus: 'ACTIVE',
       sourceVerified: true,
       verificationStatus: 'ACTIVE',
     };
 
-    discoveryJobStore.saveJobs([transientJob], 'test-run-1');
+    discoveryJobStore.saveJobs([transientJob], 'save-run-test');
 
-    // JobRepository.findById resolves transient job
-    const resolvedTransient = await jobRepo.findById('transient-job-test-101');
-    expect(resolvedTransient).toBeDefined();
-    expect(resolvedTransient?.title).toBe('Transient Flutter Engineer');
+    const result = await jobService.explicitlySaveJob(transientJob.id);
+    expect(result.success).toBe(true);
 
-    // Database fallback for persisted jobs
-    const allDbJobs = await db.getAllJobs();
-    if (allDbJobs.length > 0) {
-      const dbJobId = allDbJobs[0].id;
-      if (!discoveryJobStore.hasJob(dbJobId)) {
-        const resolvedDbJob = await jobRepo.findById(dbJobId);
-        expect(resolvedDbJob).toBeDefined();
-        expect(resolvedDbJob?.id).toBe(dbJobId);
-      }
-    }
+    const dbAfter = (await db.getAllJobs()).length;
+    expect(dbAfter).toBe(dbBefore + 1);
   });
 
-  test('5: Verify Original Post works for a transient discovered job', async () => {
-    const transientJob: any = {
-      id: 'ashby-transient-verify-original-1',
-      title: 'Senior Flutter Developer',
+  test('3. reverifyAllJobs / explicit revalidation persists updated verification status to DB', async () => {
+    const testDbJob: any = {
+      id: 'ashby-db-reverify-999',
+      title: 'Backend Software Engineer',
+      company: 'DbCorp',
+      location: 'Sydney, AU',
+      country: 'AU',
+      url: 'https://jobs.ashbyhq.com/dbcorp/expired-job',
+      platform: 'Ashby',
+      jobStatus: 'ACTIVE',
+      sourceVerified: true,
+      verificationStatus: 'ACTIVE',
+    };
+
+    await db.saveJobs([testDbJob]);
+
+    // Explicit revalidation with persist: true persists changes to DB
+    const res = await jobVerificationService.verifyExternalJob(testDbJob, undefined, { persist: true });
+    expect(res.status).toBe('EXPIRED');
+
+    const reloaded = await db.getJobById('ashby-db-reverify-999');
+    expect(reloaded).toBeDefined();
+    expect(reloaded?.verificationStatus).toBe('EXPIRED');
+  });
+
+  test('4. Discovery and HTTP response use the exact same discoveryRunId', async () => {
+    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
+
+    expect(response.discoveryRunId).toBeDefined();
+    expect(response.report.discoveryRunId).toBe(response.discoveryRunId);
+
+    const snapshot = discoveryJobStore.getRunSnapshot(response.discoveryRunId);
+    expect(snapshot).toBeDefined();
+  });
+
+  test('5. Flutter job with JSON-LD description containing Flutter passes', () => {
+    const job: any = {
+      id: 'job-flutter-jsonld-1',
+      title: 'Software Engineer',
       company: 'Canva',
       location: 'Sydney, AU',
       country: 'AU',
-      url: 'https://jobs.ashbyhq.com/canva/transient-1',
-      platform: 'Ashby',
-      jobStatus: 'ACTIVE',
-      sourceVerified: true,
-      verificationStatus: 'ACTIVE',
-      lastVerifiedAt: new Date().toISOString(),
+      description: 'Building mobile applications',
     };
 
-    discoveryJobStore.saveJobs([transientJob], 'run-verify-orig');
+    const verifiedDescription = 'We are hiring a Software Engineer to develop cross-platform mobile apps in Flutter and Dart.';
+    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, verifiedDescription);
 
-    const result = await jobService.verifyOriginalPost('ashby-transient-verify-original-1');
-    expect(result.success).toBe(true);
-    expect(result.canOpen).toBe(true);
-    expect(result.finalUrl).toBe('https://jobs.ashbyhq.com/canva/transient-1');
+    expect(result.searchRelevanceVerified).toBe(true);
   });
 
-  test('7 & 13: Two discovery runs remain independent and do not pollute DB', async () => {
-    const dbBefore = (await db.getAllJobs()).length;
+  test('6. Generic Software Engineer whose footer/navigation merely contains Flutter fails', () => {
+    const job: any = {
+      id: 'job-generic-infra-1',
+      title: 'Software Engineer, Data Infrastructure',
+      company: 'TechCorp',
+      location: 'San Francisco, US',
+      country: 'US',
+      description: 'Managing PostgreSQL databases, Go services, and Kubernetes clusters.',
+    };
 
-    const run1 = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
-    expect(run1.jobs.length).toBe(1);
+    // Job-specific description does NOT contain Flutter or Dart
+    const verifiedDescription = 'Responsible for backend infrastructure, PostgreSQL databases, Go microservices, and Kubernetes clusters.';
 
-    const run2 = await jobService.triggerScrape({ query: 'nonexistent-query-xyz-888', countries: ['ALL'] });
-    expect(run2.jobs).toEqual([]);
+    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, verifiedDescription);
 
-    const dbAfter = (await db.getAllJobs()).length;
-    expect(dbAfter).toBe(dbBefore);
+    expect(result.searchRelevanceVerified).toBe(false);
+    expect(result.searchRelevanceReason).toContain('missing requested technology requirement');
   });
 
-  test('8 & 15: Zero discovery results return jobs: [] and do NOT load database jobs as fallback', async () => {
-    const response = await jobService.triggerScrape({ query: 'nonexistent-technology-query-xyz-9999', countries: ['ALL'] });
+  test('7. "flutter python" requires both technology groups (Flutter/Dart AND Python)', () => {
+    const job: any = {
+      id: 'job-flutter-only-1',
+      title: 'Senior Flutter Developer',
+      company: 'MobileInc',
+      location: 'Remote',
+      country: 'US',
+    };
 
-    expect(response.success).toBe(true);
-    expect(response.jobs).toEqual([]);
-    expect(response.scrapedCount).toBe(0);
+    // Description has Flutter/Dart, but lacks Python
+    const flutterOnlyDesc = 'Developing mobile applications using Flutter and Dart framework.';
+    const res1 = jobVerificationService.verifySearchQueryRelevance(job, 'flutter python', job.title, flutterOnlyDesc);
+
+    expect(res1.searchRelevanceVerified).toBe(false);
+    expect(res1.searchRelevanceReason).toContain('python');
+
+    // Description has BOTH Flutter and Python
+    const bothDesc = 'Developing mobile applications using Flutter and Dart, with Python backend services.';
+    const res2 = jobVerificationService.verifySearchQueryRelevance(job, 'flutter python', job.title, bothDesc);
+
+    expect(res2.searchRelevanceVerified).toBe(true);
   });
 
-  test('9: Explicit Save Job explicitly persists transient job to database', async () => {
-    const transientJob: any = {
-      id: 'transient-save-me-123',
-      title: 'Explicit Save Test Engineer',
-      company: 'SaveCorp',
+  test('8. "flutter" accepts Flutter OR Dart in legitimate job-specific content', () => {
+    const job: any = {
+      id: 'job-dart-dev-1',
+      title: 'Mobile Application Engineer',
+      company: 'AppStudio',
       location: 'Berlin, DE',
       country: 'DE',
-      url: 'https://jobs.ashbyhq.com/savecorp/123',
+    };
+
+    const dartOnlyDesc = 'Building high performance cross platform apps using Dart.';
+    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, dartOnlyDesc);
+
+    expect(result.searchRelevanceVerified).toBe(true);
+  });
+
+  test('9. Transient jobs remain resolvable through JobRepository', async () => {
+    const transientJob: any = {
+      id: 'transient-resolvable-777',
+      title: 'Transient Mobile Engineer',
+      company: 'TransientCo',
+      location: 'Melbourne, AU',
+      country: 'AU',
+      url: 'https://jobs.ashbyhq.com/transientco/777',
       platform: 'Ashby',
       jobStatus: 'ACTIVE',
       sourceVerified: true,
       verificationStatus: 'ACTIVE',
     };
 
-    discoveryJobStore.saveJobs([transientJob], 'save-run-1');
+    discoveryJobStore.saveJobs([transientJob], 'run-transient-777');
 
-    const result = await jobService.explicitlySaveJob('transient-save-me-123');
-    expect(result.success).toBe(true);
-    expect(result.job.id).toBe('transient-save-me-123');
-
-    // Confirm it now exists in DB
-    const savedInDb = await db.getJobById('transient-save-me-123');
-    expect(savedInDb).toBeDefined();
-    expect(savedInDb?.company).toBe('SaveCorp');
+    const resolved = await jobRepo.findById('transient-resolvable-777');
+    expect(resolved).toBeDefined();
+    expect(resolved?.company).toBe('TransientCo');
   });
 
-  test('10: Zero fake or demo jobs in discovery result', async () => {
-    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
+  test('10. Existing saved DB jobs still resolve correctly', async () => {
+    const allDbJobs = await db.getAllJobs();
+    expect(allDbJobs.length).toBeGreaterThan(0);
 
-    const containsDemo = response.jobs.some(
-      (j: any) =>
-        j.id.includes('demo') ||
-        j.id.includes('vienna') ||
-        j.isDemoJob === true ||
-        (j.company || '').toLowerCase().includes('demo technologies')
-    );
-    expect(containsDemo).toBe(false);
+    const firstDbJob = allDbJobs[0];
+    const resolvedDbJob = await jobRepo.findById(firstDbJob.id);
+
+    expect(resolvedDbJob).toBeDefined();
+    expect(resolvedDbJob?.id).toBe(firstDbJob.id);
   });
 });

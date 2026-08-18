@@ -68,6 +68,7 @@ export interface SearchEngineCrawlReport {
     missingKeywords: string[];
     rejectionReason: string;
   }>;
+  discoveryRunId?: string;
   debug: {
     queriesGenerated: string[];
     rawJobsCollected: number;
@@ -118,7 +119,8 @@ export class JobScraperEngine {
    */
   public async executeParallelCrawl(
     query: JobSearchQuery = {},
-    pagination: PaginationOptions = { page: 1, limit: 50 }
+    pagination: PaginationOptions = { page: 1, limit: 50 },
+    discoveryRunId?: string
   ): Promise<SearchEngineCrawlReport> {
     const visaOnly = query.visaOnly === true;
     const remoteOnly = query.remoteOnly === true;
@@ -466,9 +468,9 @@ export class JobScraperEngine {
     console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
 
     // 10. Store verified active jobs in Transient Discovery Store (NO database write)
-    const discoveryRunId = `disc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const runId = discoveryRunId || `disc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     if (scoredRawJobs.length > 0) {
-      discoveryJobStore.saveJobs(scoredRawJobs, discoveryRunId);
+      discoveryJobStore.saveJobs(scoredRawJobs, runId);
     }
 
     // 8. Top 50 jobs ordered by priority and matchScore
@@ -478,10 +480,11 @@ export class JobScraperEngine {
     logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${deduplicated.length}`);
     logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${countryFilteredJobs.length}`);
     logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
-    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length} (Transient stored, 0 DB writes)`);
+    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length} (Transient stored, 0 DB writes, runId=${runId})`);
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,
+      discoveryRunId: runId,
       rawScraped: rawJobs.length,
       freshJobsReturned: scoredRawJobs.length,
       duplicatesFiltered: duplicatesRemovedCount,
@@ -490,6 +493,7 @@ export class JobScraperEngine {
 
     return {
       mode,
+      discoveryRunId: runId,
       totalScrapedRaw: rawJobs.length,
       freshJobsReturned: scoredRawJobs.length,
       totalUniqueNew: scoredRawJobs.length,
