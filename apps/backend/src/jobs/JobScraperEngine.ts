@@ -399,8 +399,8 @@ export class JobScraperEngine {
     const verifiedActiveJobs: JobListing[] = [];
     const userSearchTerm = (query.q || query.userQuery || '').trim();
 
-    // Optimize verification speed: Verify top 30 candidate jobs in parallel chunks of 10
-    const candidatesToVerify = countryFilteredJobs.slice(0, 30);
+    // Verify ALL candidate jobs in parallel chunks of 10
+    const candidatesToVerify = countryFilteredJobs;
     const chunkSize = 10;
 
     for (let i = 0; i < candidatesToVerify.length; i += chunkSize) {

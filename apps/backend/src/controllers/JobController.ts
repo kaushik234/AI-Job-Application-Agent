@@ -88,7 +88,7 @@ export class JobController {
   public verifyJob = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const job = await db.getJobById(id);
+      const job = await this.jobRepo.findById(id);
       if (!job) {
         res.status(404).json({ success: false, error: 'Job listing not found' });
         return;
@@ -114,7 +114,7 @@ export class JobController {
   public getDebugSource = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const job = await db.getJobById(id);
+      const job = await this.jobRepo.findById(id);
       if (!job) {
         res.status(404).json({ success: false, error: 'Job listing not found' });
         return;
@@ -147,7 +147,7 @@ export class JobController {
   public verifyOriginalPost = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const job = await db.getJobById(id);
+      const job = await this.jobRepo.findById(id);
       if (!job) {
         res.status(404).json({ success: false, error: 'Job listing not found' });
         return;

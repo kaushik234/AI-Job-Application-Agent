@@ -312,25 +312,27 @@ export class JobVerificationService {
           };
         }
 
-        // Broad role title (e.g. "Mobile Engineer", "Cross Platform Engineer") -> Require explicit tech in verified description
-        const isMobileOrCrossPlatformRole =
-          titleToUse.includes('mobile') ||
-          titleToUse.includes('cross platform') ||
-          titleToUse.includes('application') ||
-          titleToUse.includes('frontend');
+        // Check if verified description or full content explicitly contains target technology or closely related technology
+        const relatedTechs: Record<string, string[]> = {
+          flutter: ['flutter', 'dart'],
+          ios: ['ios', 'swift'],
+          android: ['android', 'kotlin'],
+          react: ['react', 'react native'],
+        };
 
-        if (isMobileOrCrossPlatformRole) {
-          if (descToUse.includes(tech) || descToUse.includes('dart')) {
-            return {
-              searchRelevanceVerified: true,
-              searchRelevanceScore: 0.85,
-              searchRelevanceReason: `Verified job description explicitly requires target search technology (${tech}).`,
-              searchQuery: rawQuery,
-            };
-          }
+        const checkTerms = relatedTechs[tech] || [tech];
+        const hasTechInDesc = checkTerms.some((term) => descToUse.includes(term));
+
+        if (hasTechInDesc) {
+          return {
+            searchRelevanceVerified: true,
+            searchRelevanceScore: 0.85,
+            searchRelevanceReason: `Verified job description explicitly requires target search technology (${tech}).`,
+            searchQuery: rawQuery,
+          };
         }
 
-        // If job title is specific to ANOTHER domain/platform (e.g., "Senior Software Engineer (iOS), SDK", "Backend Go Engineer", "Infra Engineer") and lacks target tech in description => REJECT
+        // Otherwise reject generic roles lacking target tech in verified title and description
         return {
           searchRelevanceVerified: false,
           searchRelevanceScore: 0.10,
@@ -886,8 +888,9 @@ export class JobVerificationService {
       job.applyabilityStatus = 'EXPIRED';
     }
 
-    await db.saveJobs([job]);
-    logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Applyability: ${job.applyabilityStatus} | Verified: ${result.verified}`);
+    // DISCOVERY / VERIFICATION != DATABASE WRITE
+    // During live discovery, verification mutates the in-memory JobListing model without writing to database.
+    logger.info('SEARCH', `[JOB_VERIFICATION] ${job.company} (${job.title}) -> Status: ${result.status} | Applyability: ${job.applyabilityStatus} | Verified: ${result.verified} (In-memory updated, 0 DB writes)`);
     return job;
   }
 

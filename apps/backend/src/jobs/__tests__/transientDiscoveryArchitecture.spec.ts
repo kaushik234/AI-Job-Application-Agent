@@ -28,7 +28,7 @@ jest.mock('../JobScraperEngine', () => {
             ];
 
         if (jobs.length > 0) {
-          discoveryJobStore.saveJobs(jobs, `disc_${Date.now()}`);
+          discoveryJobStore.saveJobs(jobs as any, `disc_${Date.now()}`);
         }
 
         return {
