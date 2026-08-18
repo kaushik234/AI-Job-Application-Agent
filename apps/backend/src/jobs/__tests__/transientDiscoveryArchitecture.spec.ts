@@ -3,6 +3,7 @@ import { JobRepository } from '../../repositories/JobRepository';
 import { db } from '../../database';
 import { JobService } from '../../modules/job/job.service';
 import { jobVerificationService } from '../../services/JobVerificationService';
+import { runDatabaseCleanup } from '../../scripts/cleanupSyntheticJobs';
 
 // Module mock to prevent real external HTTP calls during unit tests
 jest.mock('../JobScraperEngine', () => {
@@ -89,6 +90,10 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     (jobService as any).activeDiscoveryFlights?.clear();
   });
 
+  afterAll(() => {
+    runDatabaseCleanup();
+  });
+
   test('1. Live discovery does NOT increase DB count', async () => {
     const dbJobsBefore = (await db.getAllJobs()).length;
 
@@ -167,17 +172,19 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(response.report.rejectionSamples.length).toBeLessThanOrEqual(10);
   });
 
-  test('6. Discovery pipeline counts are real and present in report', async () => {
+  test('6. Discovery pipeline counts never increase between stages', async () => {
     const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
 
     const pipeline = (response.report as any).pipeline;
     expect(pipeline).toBeDefined();
-    expect(pipeline.rawJobsCollected).toBeDefined();
-    expect(pipeline.afterDeduplication).toBeDefined();
-    expect(pipeline.afterRoleRelevance).toBeDefined();
-    expect(pipeline.afterVerification).toBeDefined();
-    expect(pipeline.afterRanking).toBeDefined();
     expect(pipeline.returned).toBe(response.jobs.length);
+    expect(pipeline.returned).toBeLessThanOrEqual(pipeline.afterRanking);
+    expect(pipeline.afterRanking).toBeLessThanOrEqual(pipeline.afterVerification);
+    expect(pipeline.afterVerification).toBeLessThanOrEqual(pipeline.afterLocationFilter);
+    expect(pipeline.afterLocationFilter).toBeLessThanOrEqual(pipeline.afterRoleRelevance);
+    expect(pipeline.afterRoleRelevance).toBeLessThanOrEqual(pipeline.afterQueryFilter);
+    expect(pipeline.afterQueryFilter).toBeLessThanOrEqual(pipeline.afterDeduplication);
+    expect(pipeline.afterDeduplication).toBeLessThanOrEqual(pipeline.rawJobsCollected);
   });
 
   test('7. Returned count equals actual jobs array length', async () => {

@@ -43,6 +43,8 @@ export function runDatabaseCleanup() {
       idLower.includes('mock') ||
       idLower.includes('e2e') ||
       idLower.includes('sample') ||
+      idLower.includes('test') ||
+      idLower.includes('transient') ||
       idLower.includes('ind-a810') ||
       idLower.includes('li-3910') ||
       idLower.includes('seek-1029') ||
@@ -57,6 +59,10 @@ export function runDatabaseCleanup() {
       companyLower.includes('example corp') ||
       companyLower.includes('amazon canada') ||
       companyLower.includes('personio') ||
+      companyLower.includes('savecorp') ||
+      companyLower.includes('dbcorp') ||
+      companyLower.includes('mockcorp') ||
+      titleLower.includes('explicit save') ||
       isCountryMismatch;
 
     return !isSynthetic;

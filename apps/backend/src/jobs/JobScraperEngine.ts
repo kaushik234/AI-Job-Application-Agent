@@ -370,9 +370,26 @@ export class JobScraperEngine {
       console.log(`[REJECTION_DIAGNOSTIC] ${JSON.stringify(diag, null, 2)}`);
     };
 
-    // 6. STEP 2: Role Relevance Filter (Phase 2 & Task 4)
-    const roleRelevantJobs: JobListing[] = [];
+    // 6. STEP 2: Search Query Relevance Filter (TASK 1)
+    const userSearchTerm = (query.q || query.userQuery || '').trim();
+    const queryFilteredJobs: JobListing[] = [];
     for (const job of deduplicated) {
+      if (userSearchTerm) {
+        const queryCheck = jobVerificationService.verifySearchQueryRelevance(job, userSearchTerm, job.title, job.description);
+        if (queryCheck.searchRelevanceVerified) {
+          queryFilteredJobs.push(job);
+        } else {
+          rejectionStats.SEARCH_QUERY_MISMATCH++;
+          logRejection(job, 'SEARCH_QUERY_MISMATCH', queryCheck.searchRelevanceReason);
+        }
+      } else {
+        queryFilteredJobs.push(job);
+      }
+    }
+
+    // 7. STEP 3: Role Relevance Filter
+    const roleRelevantJobs: JobListing[] = [];
+    for (const job of queryFilteredJobs) {
       const roleDiag = checkRoleRelevanceDetails(job, masterResume, derived.userQuery);
       if (roleDiag.isRelevant) {
         roleRelevantJobs.push(job);
@@ -382,7 +399,7 @@ export class JobScraperEngine {
       }
     }
 
-    // 7. STEP 3: Country & Location Compatibility Filter (Phase 7 & Task 3)
+    // 8. STEP 4: Country & Location Compatibility Filter
     const countryFilteredJobs: JobListing[] = [];
     if (!isWorldwide && query.countries && query.countries.length > 0) {
       const allowedCountries = query.countries.map((c) => String(c).toUpperCase());
@@ -407,9 +424,8 @@ export class JobScraperEngine {
       countryFilteredJobs.push(...roleRelevantJobs);
     }
 
-    // 8. STEP 4: Live External Source Verification & Search Query Gate (Phase 6 & Task 6)
+    // 9. STEP 5: Live External Source Verification & Search Query Gate
     const verifiedActiveJobs: JobListing[] = [];
-    const userSearchTerm = (query.q || query.userQuery || '').trim();
 
     // Verify ALL candidate jobs in parallel chunks of 10
     const candidatesToVerify = countryFilteredJobs;
@@ -462,14 +478,14 @@ export class JobScraperEngine {
       }
     }
 
-    // 9. STEP 5: Candidate Matching & Ranking (Phase 4 & Task 3)
+    // 10. STEP 6: Candidate Matching & Ranking
     const scoredRawJobs = jobRankingService.rankJobs(verifiedActiveJobs, masterResume);
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
     const pipeline = {
       rawJobsCollected: rawJobs.length,
       afterDeduplication: deduplicated.length,
-      afterQueryFilter: deduplicated.length,
+      afterQueryFilter: queryFilteredJobs.length,
       afterRoleRelevance: roleRelevantJobs.length,
       afterLocationFilter: countryFilteredJobs.length,
       afterVerification: verifiedActiveJobs.length,
@@ -480,7 +496,7 @@ export class JobScraperEngine {
     const debug = {
       queriesGenerated: activeSubQueries,
       rawJobsCollected: rawJobs.length,
-      afterQueryFilter: deduplicated.length,
+      afterQueryFilter: queryFilteredJobs.length,
       afterRoleRelevance: roleRelevantJobs.length,
       afterLocationFilter: countryFilteredJobs.length,
       afterVerification: verifiedActiveJobs.length,
