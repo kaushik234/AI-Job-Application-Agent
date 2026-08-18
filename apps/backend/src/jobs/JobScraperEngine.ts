@@ -171,19 +171,45 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
-    const targetProfile = deriveCandidateTargetProfile(masterResume);
-    const dynamicSubQueries = ['Flutter Developer', 'Flutter Engineer', 'Mobile Developer', 'Mobile Engineer', 'Software Engineer - Mobile'];
-
-    if (targetProfile.coreTechnologies.includes('kotlin') || targetProfile.coreTechnologies.includes('android sdk') || targetProfile.roleFamilies.includes('native_android')) {
-      dynamicSubQueries.push('Android Developer');
-    }
-    if (targetProfile.coreTechnologies.includes('swift') || targetProfile.coreTechnologies.includes('ios sdk') || targetProfile.roleFamilies.includes('native_ios')) {
-      dynamicSubQueries.push('iOS Developer');
-    }
-
     const activeSubQueries = derived.userQuery
-      ? Array.from(new Set([derived.userQuery, ...dynamicSubQueries]))
-      : Array.from(new Set([...(derived.primaryQueries || []), ...dynamicSubQueries]));
+      ? [derived.userQuery]
+      : (derived.keywords || []);
+
+    if (activeSubQueries.length === 0) {
+      logger.warn('SEARCH', '[SCRAPE_ABORTED] No candidate resume or keywords available to derive target discovery queries.');
+      return {
+        mode,
+        discoveryRunId: discoveryRunId || `disc_${Date.now()}_empty`,
+        totalScrapedRaw: 0,
+        freshJobsReturned: 0,
+        totalUniqueNew: 0,
+        duplicatesFiltered: 0,
+        providersProcessed: this.providers.length,
+        providerBreakdown: {},
+        rejectionStats: {},
+        pipeline: {
+          rawJobsCollected: 0,
+          afterDeduplication: 0,
+          afterQueryFilter: 0,
+          afterRoleRelevance: 0,
+          afterLocationFilter: 0,
+          afterVerification: 0,
+          afterRanking: 0,
+          returned: 0,
+        },
+        debug: {
+          queriesGenerated: [],
+          rawJobsCollected: 0,
+          afterQueryFilter: 0,
+          afterRoleRelevance: 0,
+          afterLocationFilter: 0,
+          afterVerification: 0,
+          finalJobs: 0,
+        },
+        rejectionSamples: [],
+        jobs: [],
+      };
+    }
 
     // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {

@@ -21,102 +21,80 @@ export interface CandidateTargetProfile {
  * Does NOT hardcode any candidate-specific strings statically.
  */
 export function deriveCandidateTargetProfile(resume?: MasterResume | null): CandidateTargetProfile {
-  const languages = (resume?.skills?.languages || []).map((s) => s.toLowerCase().trim());
-  const frameworks = (resume?.skills?.frameworks || []).map((s) => s.toLowerCase().trim());
-  const databases = (resume?.skills?.databases || []).map((s) => s.toLowerCase().trim());
-  const tools = (resume?.skills?.tools || []).map((s) => s.toLowerCase().trim());
-  const cloud = (resume?.skills?.cloudAndDevOps || []).map((s) => s.toLowerCase().trim());
+  if (!resume) {
+    return {
+      primaryRoles: [],
+      coreTechnologies: [],
+      secondaryTechnologies: [],
+      roleFamilies: [],
+      prohibitedRoleTerms: [],
+      seniority: 'Mid',
+      experienceYears: 0,
+    };
+  }
 
-  const allSkills = Array.from(new Set([...languages, ...frameworks, ...databases, ...tools, ...cloud])).filter((s) => s.length > 0);
+  const rawLanguages = (resume.skills?.languages || []).map((s) => s.trim());
+  const rawFrameworks = (resume.skills?.frameworks || []).map((s) => s.trim());
+  const rawDatabases = (resume.skills?.databases || []).map((s) => s.trim());
+  const rawTools = (resume.skills?.tools || []).map((s) => s.trim());
+  const rawCloud = (resume.skills?.cloudAndDevOps || []).map((s) => s.trim());
 
-  const experienceYears = resume ? calculateResumeExperienceYears(resume) : 3;
+  const allSkills = Array.from(new Set([...rawLanguages, ...rawFrameworks, ...rawDatabases, ...rawTools, ...rawCloud])).filter((s) => s.length > 0);
+  const skillsLower = allSkills.map((s) => s.toLowerCase());
+
+  const experienceYears = calculateResumeExperienceYears(resume);
   let seniority: 'Junior' | 'Mid' | 'Senior' | 'Lead' = 'Mid';
-  if (experienceYears >= 6) seniority = 'Senior';
+  if (experienceYears >= 6) seniority = 'Lead';
+  else if (experienceYears >= 4) seniority = 'Senior';
   else if (experienceYears < 2) seniority = 'Junior';
 
-  const primaryRoles = (resume?.experience || [])
+  const primaryRoles = (resume.experience || [])
     .map((e) => e.role)
     .filter((r): r is string => !!r && r.trim().length > 0);
 
-  if (primaryRoles.length === 0) {
-    if (frameworks.includes('flutter') || languages.includes('dart')) {
-      primaryRoles.push('Flutter Developer');
-    } else if (languages.includes('kotlin') || frameworks.includes('android')) {
-      primaryRoles.push('Android Developer');
-    } else if (languages.includes('swift') || frameworks.includes('uikit')) {
-      primaryRoles.push('iOS Developer');
-    } else {
-      primaryRoles.push('Software Engineer');
-    }
-  }
-
-  const coreTechnologies: string[] = [];
+  const coreTechnologies: string[] = [...allSkills];
   const roleFamilies: string[] = [];
 
-  const hasFlutter = allSkills.some((s) => s.includes('flutter') || s.includes('dart'));
-  const hasAndroidNative = allSkills.some((s) => s.includes('kotlin') || s.includes('android sdk') || s.includes('aosp') || s.includes('jetpack'));
-  const hasIosNative = allSkills.some((s) => s.includes('swift') || s.includes('uikit') || s.includes('xcode') || s.includes('objective-c'));
-  const hasWebFrontend = allSkills.some((s) => s.includes('react') || s.includes('vue') || s.includes('angular') || s.includes('next') || s.includes('typescript'));
-  const hasBackend = allSkills.some((s) => s.includes('node') || s.includes('express') || s.includes('python') || s.includes('django') || s.includes('java') || s.includes('spring') || s.includes('golang') || s.includes('go'));
+  const textScan = `${primaryRoles.join(' ')} ${skillsLower.join(' ')}`.toLowerCase();
 
-  if (hasFlutter) {
-    coreTechnologies.push('flutter', 'dart');
+  if (textScan.includes('flutter') || textScan.includes('dart')) {
     roleFamilies.push('flutter', 'cross_platform_mobile', 'mobile');
   }
-  if (hasAndroidNative) {
-    coreTechnologies.push('kotlin', 'java', 'android sdk');
+  if (textScan.includes('kotlin') || textScan.includes('android')) {
     roleFamilies.push('native_android', 'mobile');
   }
-  if (hasIosNative) {
-    coreTechnologies.push('swift', 'uikit', 'ios sdk');
+  if (textScan.includes('swift') || textScan.includes('ios') || textScan.includes('uikit')) {
     roleFamilies.push('native_ios', 'mobile');
   }
-  if (hasWebFrontend) {
-    roleFamilies.push('web_frontend');
+  if (textScan.includes('react') || textScan.includes('vue') || textScan.includes('angular') || textScan.includes('frontend')) {
+    roleFamilies.push('web_frontend', 'frontend');
   }
-  if (hasBackend) {
-    roleFamilies.push('backend_systems');
+  if (textScan.includes('node') || textScan.includes('python') || textScan.includes('django') || textScan.includes('java') || textScan.includes('golang') || textScan.includes('express') || textScan.includes('backend')) {
+    roleFamilies.push('backend_systems', 'backend');
+  }
+  if (textScan.includes('spark') || textScan.includes('snowflake') || textScan.includes('data engineer') || textScan.includes('etl') || textScan.includes('hadoop')) {
+    roleFamilies.push('data_engineering', 'data');
+  }
+  if (textScan.includes('aws') || textScan.includes('devops') || textScan.includes('kubernetes') || textScan.includes('terraform') || textScan.includes('docker')) {
+    roleFamilies.push('devops', 'cloud');
   }
 
   const prohibitedRoleTerms: string[] = [];
-  // If candidate is a Flutter / Cross Platform candidate WITHOUT native Android skills in their resume:
+  const hasFlutter = roleFamilies.includes('flutter');
+  const hasAndroidNative = roleFamilies.includes('native_android');
+  const hasIosNative = roleFamilies.includes('native_ios');
+
   if (hasFlutter && !hasAndroidNative) {
-    prohibitedRoleTerms.push(
-      'android systems engineer',
-      'android platform engineer',
-      'android framework engineer',
-      'android os engineer',
-      'android infrastructure engineer',
-      'android engineer',
-      'android developer',
-      'android sdk'
-    );
+    prohibitedRoleTerms.push('android engineer', 'android developer', 'android sdk');
   }
-  // If candidate lacks native iOS skills:
   if (hasFlutter && !hasIosNative) {
-    prohibitedRoleTerms.push(
-      'ios engineer',
-      'ios developer',
-      'ios sdk engineer',
-      'swift engineer'
-    );
-  }
-  // Unrelated low-level or non-mobile systems engineering (unless candidate has hardware/c++ skills)
-  if (hasFlutter && !allSkills.some((s) => s.includes('c++') || s.includes('embedded') || s.includes('firmware'))) {
-    prohibitedRoleTerms.push(
-      'camera firmware engineer',
-      'camera software engineer',
-      'embedded engineer',
-      'firmware engineer',
-      'c++ systems engineer',
-      'aosp engineer'
-    );
+    prohibitedRoleTerms.push('ios engineer', 'ios developer', 'swift engineer');
   }
 
   return {
-    primaryRoles,
+    primaryRoles: Array.from(new Set(primaryRoles)),
     coreTechnologies: Array.from(new Set(coreTechnologies)),
-    secondaryTechnologies: allSkills.filter((s) => !coreTechnologies.includes(s)),
+    secondaryTechnologies: [],
     roleFamilies: Array.from(new Set(roleFamilies)),
     prohibitedRoleTerms,
     seniority,

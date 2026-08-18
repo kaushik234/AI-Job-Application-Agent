@@ -53,134 +53,134 @@ export function calculateResumeExperienceYears(resume?: MasterResume | null): nu
   return Math.max(1, Number((totalMonths / 12).toFixed(1)));
 }
 
+import { deriveCandidateTargetProfile } from './resumeMatcher';
+
 /**
  * Derives clean, candidate-specific job search keywords from MasterResume dynamically.
  * If userQuery is provided explicitly, it is prioritized as the primary effective search keyword.
  */
 export function deriveSearchQueriesFromResume(resume?: MasterResume | null, userQuery?: string): DerivedJobQueries {
   const userQueryClean = userQuery && userQuery.trim().length > 0 ? userQuery.trim() : undefined;
-  const primaryQueriesSet = new Set<string>();
-  const resumeQueriesSet = new Set<string>();
 
-  const totalYearsExperience = calculateResumeExperienceYears(resume);
-  let seniorityLevel: 'Junior' | 'Mid' | 'Senior' | 'Lead' = 'Mid';
-  if (totalYearsExperience >= 6) {
-    seniorityLevel = 'Lead';
-  } else if (totalYearsExperience >= 4) {
-    seniorityLevel = 'Senior';
-  } else if (totalYearsExperience < 2) {
-    seniorityLevel = 'Junior';
+  const profile = deriveCandidateTargetProfile(resume);
+  const totalYearsExperience = profile.experienceYears;
+  const seniorityLevel = profile.seniority;
+
+  // Diagnostic Candidate Target Profile Log
+  console.log('[CANDIDATE_TARGET_PROFILE]', JSON.stringify({
+    primaryRoles: profile.primaryRoles,
+    coreTechnologies: profile.coreTechnologies,
+    roleFamilies: profile.roleFamilies,
+    seniority: profile.seniority,
+    experienceYears: profile.experienceYears,
+  }, null, 2));
+
+  // If no candidate resume or target skills exist and in WORLDWIDE mode
+  if (!userQueryClean && profile.primaryRoles.length === 0 && profile.coreTechnologies.length === 0) {
+    console.log('[SEARCH_QUERY_GENERATOR]', JSON.stringify({
+      generatedQueries: [],
+      reason: 'No candidate resume or target skills found to derive target discovery queries.',
+    }, null, 2));
+
+    return {
+      userQuery: undefined,
+      primaryQueries: [],
+      resumeQueries: [],
+      keywords: [],
+      primaryRole: 'None',
+      seniorityLevel: 'Mid',
+      totalYearsExperience: 0,
+    };
   }
 
-  // 1. Primary role from recent work experience
-  let primaryRole = 'Software Engineer';
-  if (resume?.experience && resume.experience.length > 0) {
-    const recentRole = resume.experience[0].role;
-    if (recentRole && recentRole.trim().length > 0) {
-      primaryRole = recentRole.trim();
-      primaryQueriesSet.add(primaryRole);
-      resumeQueriesSet.add(primaryRole);
+  const generatedQueriesSet = new Set<string>();
+
+  // A. Role Title Permutations
+  for (const role of profile.primaryRoles) {
+    const rClean = role.trim();
+    if (!rClean) continue;
+    generatedQueriesSet.add(rClean);
+
+    // Swap Developer <-> Engineer
+    if (rClean.toLowerCase().includes('developer')) {
+      generatedQueriesSet.add(rClean.replace(/developer/i, 'Engineer'));
+    } else if (rClean.toLowerCase().includes('engineer')) {
+      generatedQueriesSet.add(rClean.replace(/engineer/i, 'Developer'));
+    }
+
+    // Add Senior / Lead prefix if supported
+    if ((seniorityLevel === 'Senior' || seniorityLevel === 'Lead') && !rClean.toLowerCase().startsWith('senior') && !rClean.toLowerCase().startsWith('lead')) {
+      generatedQueriesSet.add(`Senior ${rClean}`);
     }
   }
 
-  const allSkills = [
-    ...(resume?.skills?.languages || []),
-    ...(resume?.skills?.frameworks || []),
-    ...(resume?.skills?.cloudAndDevOps || []),
-    ...(resume?.skills?.databases || []),
-    ...(resume?.skills?.tools || []),
-  ].map((s) => s.trim()).filter((s) => s.length > 0);
+  // B. Core Technology + Relevant Role Permutations
+  for (const tech of profile.coreTechnologies) {
+    const tClean = tech.trim();
+    if (tClean.length < 2) continue;
 
-  const skillsLower = allSkills.map((s) => s.toLowerCase());
+    // Capitalize tech nicely
+    const tCap = tClean.charAt(0).toUpperCase() + tClean.slice(1);
 
-  // 2. High-value primary role derivations
-  const isFlutter = skillsLower.some((s) => s.includes('flutter') || s.includes('dart'));
-  const isReact = skillsLower.some((s) => s.includes('react') || s.includes('vue') || s.includes('angular') || s.includes('next'));
-  const isBackend = skillsLower.some((s) => s.includes('node') || s.includes('python') || s.includes('java') || s.includes('go') || s.includes('express'));
-  const isDevOps = skillsLower.some((s) => s.includes('aws') || s.includes('docker') || s.includes('kubernetes') || s.includes('devops') || s.includes('terraform'));
-
-  if (isFlutter) {
-    primaryQueriesSet.add('Flutter Developer');
-    primaryQueriesSet.add('Flutter Engineer');
-    primaryQueriesSet.add('Mobile Developer');
-    primaryQueriesSet.add('Mobile Engineer');
-    primaryQueriesSet.add('Software Engineer - Mobile');
-
-    resumeQueriesSet.add('Flutter Developer');
-    resumeQueriesSet.add('Flutter Engineer');
-    resumeQueriesSet.add('Mobile Developer');
-    resumeQueriesSet.add('Mobile Engineer');
-    resumeQueriesSet.add('Software Engineer - Mobile');
-    if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
-      resumeQueriesSet.add('Senior Flutter Developer');
-      resumeQueriesSet.add('Senior Flutter Engineer');
-      resumeQueriesSet.add('Lead Mobile Engineer');
-    }
-    resumeQueriesSet.add('Cross Platform Developer');
-    resumeQueriesSet.add('Dart Developer');
-  }
-
-  if (isReact) {
-    primaryQueriesSet.add('Frontend Engineer');
-    primaryQueriesSet.add('Frontend Developer');
-    primaryQueriesSet.add('Full Stack Engineer');
-    primaryQueriesSet.add('React Developer');
-
-    resumeQueriesSet.add('Frontend Engineer');
-    resumeQueriesSet.add('Frontend Developer');
-    resumeQueriesSet.add('Full Stack Engineer');
-    resumeQueriesSet.add('React Developer');
-    if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
-      resumeQueriesSet.add('Senior Frontend Engineer');
-      resumeQueriesSet.add('Senior Full Stack Engineer');
+    if (profile.roleFamilies.includes('cross_platform_mobile') || profile.roleFamilies.includes('mobile')) {
+      generatedQueriesSet.add(`${tCap} Developer`);
+      generatedQueriesSet.add(`${tCap} Engineer`);
+      generatedQueriesSet.add(`${tCap} Mobile Engineer`);
+    } else if (profile.roleFamilies.includes('backend_systems') || profile.roleFamilies.includes('backend')) {
+      generatedQueriesSet.add(`${tCap} Developer`);
+      generatedQueriesSet.add(`${tCap} Engineer`);
+      generatedQueriesSet.add(`${tCap} Backend Engineer`);
+    } else if (profile.roleFamilies.includes('web_frontend') || profile.roleFamilies.includes('frontend')) {
+      generatedQueriesSet.add(`${tCap} Developer`);
+      generatedQueriesSet.add(`${tCap} Engineer`);
+      generatedQueriesSet.add(`${tCap} Frontend Engineer`);
+    } else if (profile.roleFamilies.includes('data_engineering') || profile.roleFamilies.includes('data')) {
+      generatedQueriesSet.add(`${tCap} Engineer`);
+      generatedQueriesSet.add(`${tCap} Data Engineer`);
+    } else if (profile.roleFamilies.includes('devops') || profile.roleFamilies.includes('cloud')) {
+      generatedQueriesSet.add(`${tCap} Engineer`);
+      generatedQueriesSet.add(`${tCap} DevOps Engineer`);
+    } else {
+      generatedQueriesSet.add(`${tCap} Developer`);
+      generatedQueriesSet.add(`${tCap} Engineer`);
     }
   }
 
-  if (isBackend) {
-    primaryQueriesSet.add('Backend Engineer');
-    primaryQueriesSet.add('Software Engineer');
-
-    resumeQueriesSet.add('Backend Engineer');
-    resumeQueriesSet.add('Software Engineer');
-    resumeQueriesSet.add('Node.js Developer');
-    if (seniorityLevel === 'Senior' || seniorityLevel === 'Lead') {
-      resumeQueriesSet.add('Senior Backend Engineer');
+  // C. Role Family Base Queries (only when supported by profile.roleFamilies)
+  for (const family of profile.roleFamilies) {
+    if (family === 'cross_platform_mobile' || family === 'mobile') {
+      generatedQueriesSet.add('Mobile Developer');
+      generatedQueriesSet.add('Mobile Engineer');
+      generatedQueriesSet.add('Software Engineer - Mobile');
+    } else if (family === 'backend_systems' || family === 'backend') {
+      generatedQueriesSet.add('Backend Engineer');
+      generatedQueriesSet.add('Backend Developer');
+      generatedQueriesSet.add('Software Engineer - Backend');
+    } else if (family === 'web_frontend' || family === 'frontend') {
+      generatedQueriesSet.add('Frontend Engineer');
+      generatedQueriesSet.add('Frontend Developer');
+    } else if (family === 'fullstack') {
+      generatedQueriesSet.add('Full Stack Engineer');
+      generatedQueriesSet.add('Full Stack Developer');
+    } else if (family === 'data_engineering' || family === 'data') {
+      generatedQueriesSet.add('Data Engineer');
+      generatedQueriesSet.add('Data Platform Engineer');
+    } else if (family === 'devops' || family === 'cloud') {
+      generatedQueriesSet.add('DevOps Engineer');
+      generatedQueriesSet.add('Cloud Engineer');
     }
   }
 
-  if (isDevOps) {
-    primaryQueriesSet.add('DevOps Engineer');
-    primaryQueriesSet.add('Cloud Engineer');
+  const generatedQueries = Array.from(generatedQueriesSet);
 
-    resumeQueriesSet.add('DevOps Engineer');
-    resumeQueriesSet.add('Cloud Engineer');
-    resumeQueriesSet.add('Infrastructure Engineer');
-  }
+  // Diagnostic Generated Search Queries Log
+  console.log('[SEARCH_QUERY_GENERATOR]', JSON.stringify({
+    generatedQueries,
+    queryCount: generatedQueries.length,
+  }, null, 2));
 
-  // Secondary/expansion variations (not in primaryQueries)
-  if (isFlutter) {
-    resumeQueriesSet.add('Flutter Developer startup');
-    resumeQueriesSet.add('Flutter Engineer startup');
-    resumeQueriesSet.add('Flutter Developer SaaS');
-    resumeQueriesSet.add('Flutter Developer scale-up');
-    resumeQueriesSet.add('Mobile Developer startup');
-    resumeQueriesSet.add('Flutter Developer product company');
-  } else if (isReact) {
-    resumeQueriesSet.add('Frontend Engineer startup');
-    resumeQueriesSet.add('Full Stack Engineer SaaS');
-    resumeQueriesSet.add('React Developer scale-up');
-  } else if (isBackend) {
-    resumeQueriesSet.add('Node.js Developer startup');
-    resumeQueriesSet.add('Backend Engineer SaaS');
-    resumeQueriesSet.add('Backend Engineer scale-up');
-  }
-
-  const primaryQueries = Array.from(primaryQueriesSet).slice(0, 5);
-  if (primaryQueries.length === 0) {
-    primaryQueries.push('Software Engineer', 'Developer');
-  }
-
-  const resumeQueries = Array.from(resumeQueriesSet).slice(0, 25);
+  const primaryQueries = generatedQueries.slice(0, 5);
+  const resumeQueries = generatedQueries.slice(0, 25);
 
   let effectiveKeywords: string[];
   if (userQueryClean) {
@@ -194,7 +194,7 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     primaryQueries,
     resumeQueries,
     keywords: effectiveKeywords,
-    primaryRole,
+    primaryRole: profile.primaryRoles[0] || (generatedQueries[0] ?? 'Software Engineer'),
     seniorityLevel,
     totalYearsExperience,
   };
