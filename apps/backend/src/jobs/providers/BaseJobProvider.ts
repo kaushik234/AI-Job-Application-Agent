@@ -159,6 +159,70 @@ export abstract class BaseJobProvider implements JobDiscoveryProvider {
   }
 
   /**
+   * Helper to fetch multiple ATS board endpoints concurrently in controlled batches
+   * with per-board timeout, error isolation, and graceful partial fallback.
+   */
+  protected async fetchBatchedBoards<T>(
+    boardTokens: string[],
+    fetchBoardFn: (boardToken: string) => Promise<T[] | null>,
+    batchSize: number = 6,
+    perBoardTimeoutMs: number = 4000
+  ): Promise<{
+    items: T[];
+    boardsAttempted: number;
+    boardsSucceeded: number;
+    boardsFailed: number;
+    boardsTimedOut: number;
+  }> {
+    const items: T[] = [];
+    const boardsAttempted = boardTokens.length;
+    let boardsSucceeded = 0;
+    let boardsFailed = 0;
+    let boardsTimedOut = 0;
+
+    for (let i = 0; i < boardTokens.length; i += batchSize) {
+      const chunk = boardTokens.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        chunk.map(async (token) => {
+          let timeoutId: any;
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Board request timeout')), perBoardTimeoutMs);
+          });
+          try {
+            const res = await Promise.race([fetchBoardFn(token), timeoutPromise]);
+            clearTimeout(timeoutId);
+            return { token, res };
+          } catch (err) {
+            clearTimeout(timeoutId);
+            throw err;
+          }
+        })
+      );
+
+      for (const res of results) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value?.res)) {
+          boardsSucceeded++;
+          items.push(...res.value.res);
+        } else {
+          boardsFailed++;
+          const reason = res.status === 'rejected' ? String(res.reason?.message || res.reason) : '';
+          if (reason.toLowerCase().includes('timeout') || reason.toLowerCase().includes('abort')) {
+            boardsTimedOut++;
+          }
+        }
+      }
+    }
+
+    return {
+      items,
+      boardsAttempted,
+      boardsSucceeded,
+      boardsFailed,
+      boardsTimedOut,
+    };
+  }
+
+  /**
    * Searches live or indexed job postings matching criteria
    */
   public abstract search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults>;

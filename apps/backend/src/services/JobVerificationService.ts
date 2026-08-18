@@ -16,7 +16,11 @@ export class JobVerificationService {
    * Centralized verification entrypoint.
    * Performs deep content inspection and source-specific pattern matching.
    */
-  public async verifyExternalJob(job: JobListing, searchQuery?: string, options?: { persist?: boolean }): Promise<ExternalJobVerificationResult> {
+  public async verifyExternalJob(
+    job: JobListing,
+    searchQuery?: string,
+    options?: { isCustomUserQuery?: boolean; persist?: boolean }
+  ): Promise<ExternalJobVerificationResult> {
     const timestamp = new Date().toISOString();
     const targetUrl = job.url || job.originalUrl;
     const jobIdLower = (job.id || '').toLowerCase();
@@ -204,7 +208,7 @@ export class JobVerificationService {
       const httpStatus = response.status;
 
       // Run Platform-Specific Validators
-      const platformResult = this.runPlatformSpecificValidators(job, targetUrl, finalUrl, html, httpStatus, timestamp, searchQuery);
+      const platformResult = this.runPlatformSpecificValidators(job, targetUrl, finalUrl, html, httpStatus, timestamp, searchQuery, options);
       await this.updateJobRecord(job, platformResult, options);
       return platformResult;
     } catch (err: any) {
@@ -475,7 +479,8 @@ export class JobVerificationService {
     html: string,
     httpStatus: number,
     timestamp: string,
-    searchQuery?: string
+    searchQuery?: string,
+    options?: { isCustomUserQuery?: boolean; persist?: boolean }
   ): ExternalJobVerificationResult {
     const htmlLower = html.toLowerCase();
     const finalUrlLower = finalUrl.toLowerCase();
@@ -764,10 +769,11 @@ export class JobVerificationService {
       verifiedDescription = job.description.replace(/<[^>]+>/g, ' ').trim();
     }
 
-    // Evaluate Search Query Relevance with job-specific evidence only (never raw full page HTML)
+    // Evaluate Search Query Relevance with job-specific evidence only
     const searchRelevance = this.verifySearchQueryRelevance(job, searchQuery, detectedTitle, verifiedDescription);
 
-    if (!searchRelevance.searchRelevanceVerified) {
+    // Only fail on SEARCH_QUERY_MISMATCH if options.isCustomUserQuery is explicitly set
+    if (options?.isCustomUserQuery && !searchRelevance.searchRelevanceVerified) {
       return {
         verified: false,
         status: JobLifecycleStatus.SEARCH_QUERY_MISMATCH,
@@ -1025,8 +1031,12 @@ export class JobVerificationService {
   /**
    * Helper alias method for verifying a single job listing with searchQuery context.
    */
-  public async verifyJobListing(job: JobListing, searchQuery?: string): Promise<JobListing> {
-    await this.verifyExternalJob(job, searchQuery);
+  public async verifyJobListing(
+    job: JobListing,
+    searchQuery?: string,
+    options?: { isCustomUserQuery?: boolean; persist?: boolean }
+  ): Promise<JobListing> {
+    await this.verifyExternalJob(job, searchQuery, options);
     return job;
   }
 

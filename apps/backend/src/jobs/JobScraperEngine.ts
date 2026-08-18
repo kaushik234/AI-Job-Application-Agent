@@ -55,6 +55,16 @@ export interface SearchEngineCrawlReport {
       diagnostics?: Record<string, any>;
     }
   >;
+  discovery?: Record<
+    string,
+    {
+      attempted: number;
+      succeeded: number;
+      failed: number;
+      timedOut: number;
+      jobs: number;
+    }
+  >;
   rejectionStats: Record<string, number>;
   rejectionDiagnostics?: Array<{
     jobId: string;
@@ -77,7 +87,11 @@ export interface SearchEngineCrawlReport {
     afterRoleRelevance: number;
     afterLocationFilter: number;
     afterVerification: number;
-    afterRanking: number;
+    afterCandidateMatching: number;
+    afterApplyDecision: number;
+    recommendedJobs: number;
+    considerJobs: number;
+    rejectedJobs: number;
     returned: number;
   };
   debug: {
@@ -87,7 +101,14 @@ export interface SearchEngineCrawlReport {
     afterRoleRelevance: number;
     afterLocationFilter: number;
     afterVerification: number;
+    afterCandidateMatching: number;
+    afterApplyDecision: number;
+    recommendedJobs?: number;
+    considerJobs?: number;
+    rejectedJobs?: number;
     finalJobs: number;
+    pipeline: any;
+    discovery: any;
   };
   rejectionSamples: Array<{
     jobId: string;
@@ -98,6 +119,9 @@ export interface SearchEngineCrawlReport {
     reason: string;
   }>;
   jobs: JobListing[];
+  recommendedJobs: JobListing[];
+  considerJobs: JobListing[];
+  rejectedJobs: JobListing[];
 }
 
 export class JobScraperEngine {
@@ -194,7 +218,11 @@ export class JobScraperEngine {
           afterRoleRelevance: 0,
           afterLocationFilter: 0,
           afterVerification: 0,
-          afterRanking: 0,
+          afterCandidateMatching: 0,
+          afterApplyDecision: 0,
+          recommendedJobs: 0,
+          considerJobs: 0,
+          rejectedJobs: 0,
           returned: 0,
         },
         debug: {
@@ -204,17 +232,27 @@ export class JobScraperEngine {
           afterRoleRelevance: 0,
           afterLocationFilter: 0,
           afterVerification: 0,
+          afterCandidateMatching: 0,
+          afterApplyDecision: 0,
+          recommendedJobs: 0,
+          considerJobs: 0,
+          rejectedJobs: 0,
           finalJobs: 0,
+          pipeline: {},
+          discovery: {},
         },
         rejectionSamples: [],
         jobs: [],
+        recommendedJobs: [],
+        considerJobs: [],
+        rejectedJobs: [],
       };
     }
 
     // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {
       const controller = new AbortController();
-      const timeoutMs = 12000;
+      const timeoutMs = 16000;
       const timeoutId = setTimeout(() => {
         controller.abort();
       }, timeoutMs);
@@ -417,8 +455,20 @@ export class JobScraperEngine {
 
     // 7. STEP 3: Role Relevance Filter
     const roleRelevantJobs: JobListing[] = [];
+    const targetProfile = deriveCandidateTargetProfile(masterResume);
+
     for (const job of queryFilteredJobs) {
       const roleDiag = checkRoleRelevanceDetails(job, masterResume, derived.userQuery);
+
+      console.log('[ROLE_RELEVANCE]', JSON.stringify({
+        job: `${job.company} - ${job.title}`,
+        decision: roleDiag.isRelevant ? 'PASS' : 'REJECT',
+        matchedRoleEvidence: roleDiag.matchedKeywords,
+        matchedTechnologyEvidence: roleDiag.matchedKeywords,
+        missingEvidence: roleDiag.missingKeywords,
+        reason: roleDiag.reason,
+      }, null, 2));
+
       if (roleDiag.isRelevant) {
         roleRelevantJobs.push(job);
       } else {
@@ -464,7 +514,7 @@ export class JobScraperEngine {
       const chunkResults = await Promise.allSettled(
         chunk.map(async (job) => {
           try {
-            const verifiedJob = await jobVerificationService.verifyJobListing(job, userSearchTerm);
+            const verifiedJob = await jobVerificationService.verifyJobListing(job, userSearchTerm, { isCustomUserQuery: !!derived.userQuery });
             return { job, verifiedJob, error: null };
           } catch (err: any) {
             return { job, verifiedJob: null, error: err };
@@ -475,37 +525,36 @@ export class JobScraperEngine {
       for (const res of chunkResults) {
         if (res.status === 'fulfilled' && res.value) {
           const { job, verifiedJob, error } = res.value;
+
+          console.log('[VERIFICATION]', JSON.stringify({
+            job: `${job.company} - ${job.title}`,
+            urlLive: verifiedJob?.sourceVerified ?? false,
+            contentFetched: !!verifiedJob?.description,
+            queryEvidence: verifiedJob?.searchRelevance?.searchQuery || userSearchTerm || 'WORLDWIDE',
+            candidateProfileEvidence: targetProfile.primaryRoles.join(', '),
+            decision: verifiedJob?.sourceVerified && verifiedJob.verificationStatus === 'ACTIVE' ? 'ACTIVE' : (verifiedJob?.verificationStatus || 'REJECTED'),
+            reason: verifiedJob?.verificationReason || 'Verification check completed',
+          }, null, 2));
+
           if (error) {
             rejectionStats.OTHER++;
-            logRejection(job, 'VERIFICATION_ERROR', error.message);
+            logRejection(job, 'VERIFICATION', error.message);
           } else if (verifiedJob) {
             const freshnessCat = classifyFreshnessCategory(verifiedJob.postedDate || verifiedJob.postedAt);
-            if (freshnessCat === 'STALE') {
-              rejectionStats.STALE = (rejectionStats.STALE || 0) + 1;
-              logRejection(
-                job,
-                'STALE',
-                `External job posting date (${verifiedJob.postedDate || verifiedJob.postedAt}) is >30 days old (STALE).`,
-                [],
-                [],
-                (verifiedJob as any).titleMatchScore
-              );
-            } else if (
+            verifiedJob.freshnessCategory = freshnessCat;
+
+            if (
               verifiedJob.sourceVerified === true &&
               verifiedJob.verificationStatus === 'ACTIVE' &&
               verifiedJob.jobIdentityVerified !== false
             ) {
               verifiedActiveJobs.push(verifiedJob);
             } else {
-              const statusKey = String(verifiedJob.verificationStatus || 'OTHER');
-              if (statusKey in rejectionStats) {
-                rejectionStats[statusKey]++;
-              } else {
-                rejectionStats.OTHER++;
-              }
+              const statusKey = String(verifiedJob.verificationStatus || 'EXPIRED');
+              rejectionStats[statusKey] = (rejectionStats[statusKey] || 0) + 1;
               logRejection(
                 job,
-                statusKey,
+                'VERIFICATION',
                 verifiedJob.verificationReason || `External verification failed with status ${verifiedJob.verificationStatus}`,
                 [],
                 [],
@@ -519,7 +568,61 @@ export class JobScraperEngine {
 
     // 10. STEP 6: Candidate Matching & Ranking
     const scoredRawJobs = jobRankingService.rankJobs(verifiedActiveJobs, masterResume);
-    const top50Jobs = scoredRawJobs.slice(0, 50);
+
+    // 11. STEP 7: Application Decision & Categorization (Requirements 7, 8, 9)
+    const recommendedJobs: JobListing[] = [];
+    const considerJobs: JobListing[] = [];
+    const rejectedJobs: JobListing[] = [];
+
+    scoredRawJobs.forEach((job) => {
+      const rec = (job.recommendation || (job as any).priorityCategory || '').toUpperCase();
+      const matchScore = job.matchScore ?? 50;
+
+      if (rec === 'DO_NOT_APPLY' || rec === 'SKIP') {
+        rejectedJobs.push(job);
+        logRejection(
+          job,
+          'APPLY_DECISION',
+          `Job classified as DO_NOT_APPLY (Match score: ${matchScore}%).`,
+          [],
+          [],
+          job.matchScore
+        );
+      } else if (matchScore >= 60 || rec === 'APPLY_NOW' || rec === 'TAILOR_AND_APPLY' || rec === 'HIGH_PRIORITY' || rec === 'GOOD_MATCH') {
+        recommendedJobs.push(job);
+      } else if (matchScore >= 40 || rec === 'CONSIDER') {
+        considerJobs.push(job);
+      } else {
+        rejectedJobs.push(job);
+        logRejection(
+          job,
+          'APPLY_DECISION',
+          `Low overall candidate match score (${matchScore}%).`,
+          [],
+          [],
+          job.matchScore
+        );
+      }
+    });
+
+    const qualifyingJobs = [...recommendedJobs, ...considerJobs];
+    const returnedJobs = qualifyingJobs.length > 0 ? qualifyingJobs.slice(0, 50) : scoredRawJobs.slice(0, 50);
+
+    // Build discovery telemetry per provider
+    const discoveryTelemetry: Record<string, { attempted: number; succeeded: number; failed: number; timedOut: number; jobs: number }> = {};
+    this.providers.forEach((p) => {
+      const pKey = p.platform.toLowerCase();
+      const pInfo = providerBreakdown[p.platform];
+      const diag = pInfo?.diagnostics;
+
+      discoveryTelemetry[pKey] = {
+        attempted: diag?.attempted ?? 1,
+        succeeded: diag?.succeeded ?? (pInfo?.scraped ? 1 : 0),
+        failed: diag?.failed ?? (pInfo?.status === 'FAILED' || pInfo?.status === 'PARSER_FAILED' ? 1 : 0),
+        timedOut: diag?.timedOut ?? (pInfo?.status === 'TIMEOUT' ? 1 : 0),
+        jobs: pInfo?.scraped ?? 0,
+      };
+    });
 
     const pipeline = {
       rawJobsCollected: rawJobs.length,
@@ -528,8 +631,12 @@ export class JobScraperEngine {
       afterRoleRelevance: roleRelevantJobs.length,
       afterLocationFilter: countryFilteredJobs.length,
       afterVerification: verifiedActiveJobs.length,
-      afterRanking: scoredRawJobs.length,
-      returned: top50Jobs.length,
+      afterCandidateMatching: scoredRawJobs.length,
+      afterApplyDecision: qualifyingJobs.length,
+      recommendedJobs: recommendedJobs.length,
+      considerJobs: considerJobs.length,
+      rejectedJobs: rejectedJobs.length,
+      returned: returnedJobs.length,
     };
 
     const debug = {
@@ -539,47 +646,75 @@ export class JobScraperEngine {
       afterRoleRelevance: roleRelevantJobs.length,
       afterLocationFilter: countryFilteredJobs.length,
       afterVerification: verifiedActiveJobs.length,
-      finalJobs: scoredRawJobs.length,
+      afterCandidateMatching: scoredRawJobs.length,
+      afterApplyDecision: qualifyingJobs.length,
+      recommendedJobs: recommendedJobs.length,
+      considerJobs: considerJobs.length,
+      rejectedJobs: rejectedJobs.length,
+      finalJobs: returnedJobs.length,
       pipeline,
+      discovery: discoveryTelemetry,
     };
 
-    console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
+    // Print top 10 rejection samples per stage (Requirement 12)
+    const stageRejections: Record<string, any[]> = {};
+    rejectionDiagnostics.forEach((diag) => {
+      if (!stageRejections[diag.stage]) {
+        stageRejections[diag.stage] = [];
+      }
+      if (stageRejections[diag.stage].length < 10) {
+        stageRejections[diag.stage].push({
+          title: diag.title,
+          company: diag.company,
+          provider: diag.provider,
+          reason: diag.rejectionReason,
+        });
+      }
+    });
 
-    // 10. Store verified active jobs in Transient Discovery Store (NO database write)
+    console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
+    console.log('[STAGE_REJECTION_DIAGNOSTICS_TOP_10]', JSON.stringify(stageRejections, null, 2));
+
+    // Store verified active jobs in Transient Discovery Store (NO database write)
     const runId = discoveryRunId || `disc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    if (scoredRawJobs.length > 0) {
-      discoveryJobStore.saveJobs(scoredRawJobs, runId);
+    if (returnedJobs.length > 0) {
+      discoveryJobStore.saveJobs(returnedJobs, runId);
     }
 
     logger.info('SEARCH', `[JOB_DEDUP] After deduplication: ${deduplicated.length}`);
     logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${deduplicated.length}`);
     logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${countryFilteredJobs.length}`);
-    logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
-    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length} (Transient stored, 0 DB writes, runId=${runId})`);
+    logger.info('SEARCH', `[MATCHING] scored=${scoredRawJobs.length}`);
+    logger.info('SEARCH', `[APPLY_DECISION] qualifying=${qualifyingJobs.length}/${scoredRawJobs.length} (rec=${recommendedJobs.length}, consider=${considerJobs.length}, rejected=${rejectedJobs.length})`);
+    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${returnedJobs.length} (Transient stored, 0 DB writes, runId=${runId})`);
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,
       discoveryRunId: runId,
       rawScraped: rawJobs.length,
-      freshJobsReturned: scoredRawJobs.length,
+      freshJobsReturned: returnedJobs.length,
       duplicatesFiltered: duplicatesRemovedCount,
-      freshScrapeCount: top50Jobs.length,
+      freshScrapeCount: returnedJobs.length,
     });
 
     return {
       mode,
       discoveryRunId: runId,
       totalScrapedRaw: rawJobs.length,
-      freshJobsReturned: scoredRawJobs.length,
-      totalUniqueNew: scoredRawJobs.length,
+      freshJobsReturned: returnedJobs.length,
+      totalUniqueNew: returnedJobs.length,
       duplicatesFiltered: duplicatesRemovedCount,
       providersProcessed: this.providers.length,
       providerBreakdown,
+      discovery: discoveryTelemetry,
       rejectionStats,
       pipeline,
       debug,
       rejectionSamples: rejectionSamples.slice(0, 10),
-      jobs: top50Jobs,
+      jobs: returnedJobs,
+      recommendedJobs,
+      considerJobs,
+      rejectedJobs,
     };
   }
 

@@ -27,56 +27,33 @@ export class LeverProvider extends BaseJobProvider {
 
       logger.info('SEARCH', `[JOB_SOURCE] Provider: Lever | Query: ${query.keywords?.join(', ') || 'All'} | Started`);
 
-      const liveJobs: JobListing[] = [];
-      let boardsAttempted = 0;
-      let boardsSucceeded = 0;
-      let boardsFailed = 0;
-      let boardsTimedOut = 0;
-      let boardsRateLimited = 0;
+      const batchRes = await this.fetchBatchedBoards(
+        LEVER_COMPANIES,
+        async (companyToken) => {
+          const res = await fetch(`https://api.lever.co/v0/postings/${companyToken}?mode=json`, {
+            headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
+          });
 
-        boardsAttempted = LEVER_COMPANIES.length;
-        await Promise.all(
-          LEVER_COMPANIES.map(async (companyToken) => {
-            try {
-              const signals = [AbortSignal.timeout(8000)];
-              if (pagination?.signal) signals.push(pagination.signal);
-              const res = await fetch(`https://api.lever.co/v0/postings/${companyToken}?mode=json`, {
-                headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-                signal: AbortSignal.any(signals),
-              });
-
-              if (res.status === 429) {
-                boardsRateLimited++;
-                boardsFailed++;
-                return;
+          if (!res.ok) return null;
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const parsed: JobListing[] = [];
+            for (const item of data) {
+              const normalized = this.normalize(item, companyToken);
+              if (normalized) {
+                parsed.push(normalized);
               }
-
-              if (!res.ok) {
-                boardsFailed++;
-                return;
-              }
-
-              const data = await res.json();
-              if (Array.isArray(data)) {
-                boardsSucceeded++;
-                for (const item of data) {
-                  const normalized = this.normalize(item, companyToken);
-                  if (normalized) {
-                    liveJobs.push(normalized);
-                  }
-                }
-              } else {
-                boardsFailed++;
-              }
-            } catch (err: any) {
-              boardsFailed++;
-              if (err.name === 'AbortError' || (err.message || '').includes('timeout')) {
-                boardsTimedOut++;
-              }
-              logger.warn('SEARCH', `[JOB_SOURCE] Lever API fetch failed for company ${companyToken}: ${err.message}`);
             }
-          })
-        );
+            return parsed;
+          }
+          return null;
+        },
+        6,
+        3500
+      );
+
+      const liveJobs = batchRes.items;
+      const { boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut } = batchRes;
 
       const rawJobsBeforeQueryFilter = liveJobs.length;
       let filtered = liveJobs;
@@ -133,7 +110,6 @@ export class LeverProvider extends BaseJobProvider {
         boardsSucceeded,
         boardsFailed,
         boardsTimedOut,
-        boardsRateLimited,
         rawJobsBeforeQueryFilter,
         rawJobsAfterQueryFilter,
         message,

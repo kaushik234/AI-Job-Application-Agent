@@ -28,56 +28,33 @@ export class GreenhouseProvider extends BaseJobProvider {
 
       logger.info('SEARCH', `[JOB_SOURCE] Provider: Greenhouse | Query: ${query.keywords?.join(', ') || 'All'} | Started`);
 
-      const liveJobs: JobListing[] = [];
-      let boardsAttempted = 0;
-      let boardsSucceeded = 0;
-      let boardsFailed = 0;
-      let boardsTimedOut = 0;
-      let boardsRateLimited = 0;
+      const batchRes = await this.fetchBatchedBoards(
+        GREENHOUSE_BOARDS,
+        async (boardToken) => {
+          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`, {
+            headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
+          });
 
-        boardsAttempted = GREENHOUSE_BOARDS.length;
-        await Promise.all(
-          GREENHOUSE_BOARDS.map(async (boardToken) => {
-            try {
-              const signals = [AbortSignal.timeout(8000)];
-              if (pagination?.signal) signals.push(pagination.signal);
-              const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`, {
-                headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-                signal: AbortSignal.any(signals),
-              });
-
-              if (res.status === 429) {
-                boardsRateLimited++;
-                boardsFailed++;
-                return;
+          if (!res.ok) return null;
+          const data = await res.json();
+          if (data && Array.isArray(data.jobs)) {
+            const parsed: JobListing[] = [];
+            for (const item of data.jobs) {
+              const normalized = this.normalize(item, boardToken);
+              if (normalized) {
+                parsed.push(normalized);
               }
-
-              if (!res.ok) {
-                boardsFailed++;
-                return;
-              }
-
-              const data = await res.json();
-              if (data && Array.isArray(data.jobs)) {
-                boardsSucceeded++;
-                for (const item of data.jobs) {
-                  const normalized = this.normalize(item, boardToken);
-                  if (normalized) {
-                    liveJobs.push(normalized);
-                  }
-                }
-              } else {
-                boardsFailed++;
-              }
-            } catch (err: any) {
-              boardsFailed++;
-              if (err.name === 'AbortError' || (err.message || '').includes('timeout')) {
-                boardsTimedOut++;
-              }
-              logger.warn('SEARCH', `[JOB_SOURCE] Greenhouse API fetch failed for board ${boardToken}: ${err.message}`);
             }
-          })
-        );
+            return parsed;
+          }
+          return null;
+        },
+        6,
+        3500
+      );
+
+      const liveJobs = batchRes.items;
+      const { boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut } = batchRes;
 
       const rawJobsBeforeQueryFilter = liveJobs.length;
       let filtered = liveJobs;
@@ -134,7 +111,6 @@ export class GreenhouseProvider extends BaseJobProvider {
         boardsSucceeded,
         boardsFailed,
         boardsTimedOut,
-        boardsRateLimited,
         rawJobsBeforeQueryFilter,
         rawJobsAfterQueryFilter,
         message,

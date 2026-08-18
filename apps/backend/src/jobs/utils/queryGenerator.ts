@@ -95,32 +95,61 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
 
   const generatedQueriesSet = new Set<string>();
 
-  // A. Role Title Permutations
+  // Excluded non-engineering role terms to prevent non-engineering titles (like Operations Manager) from becoming target queries
+  const nonEngineeringRoleTerms = [
+    'account executive', 'account manager', 'sales manager', 'marketing manager',
+    'recruiter', 'hr manager', 'finance manager', 'legal counsel', 'operations manager',
+    'project coordinator', 'administrative', 'customer support', 'content writer',
+    'social media manager', 'event marketing', 'gtm strategist'
+  ];
+
+  // A. Role Title Permutations (only clean engineering role titles)
   for (const role of profile.primaryRoles) {
     const rClean = role.trim();
     if (!rClean) continue;
+
+    const rLower = rClean.toLowerCase();
+    if (nonEngineeringRoleTerms.some((term) => rLower.includes(term))) {
+      continue;
+    }
+
     generatedQueriesSet.add(rClean);
 
     // Swap Developer <-> Engineer
-    if (rClean.toLowerCase().includes('developer')) {
+    if (rLower.includes('developer')) {
       generatedQueriesSet.add(rClean.replace(/developer/i, 'Engineer'));
-    } else if (rClean.toLowerCase().includes('engineer')) {
+    } else if (rLower.includes('engineer')) {
       generatedQueriesSet.add(rClean.replace(/engineer/i, 'Developer'));
     }
 
     // Add Senior / Lead prefix if supported
-    if ((seniorityLevel === 'Senior' || seniorityLevel === 'Lead') && !rClean.toLowerCase().startsWith('senior') && !rClean.toLowerCase().startsWith('lead')) {
+    if ((seniorityLevel === 'Senior' || seniorityLevel === 'Lead') && !rLower.startsWith('senior') && !rLower.startsWith('lead')) {
       generatedQueriesSet.add(`Senior ${rClean}`);
     }
   }
 
   // B. Core Technology + Relevant Role Permutations
+  // Restrict to major programming languages & primary frameworks (do not turn tooling like Git/VSCode/SQLite into roles)
+  const QUERY_ELIGIBLE_TECHS = new Set([
+    'flutter', 'dart', 'react native', 'android', 'ios', 'kotlin', 'swift',
+    'react', 'next.js', 'vue', 'angular', 'node', 'node.js', 'nodejs', 'python', 'django',
+    'fastapi', 'java', 'spring', 'golang', 'go', 'ruby', 'rails', 'c#', '.net', 'cpp', 'c++',
+    'spark', 'snowflake', 'sql'
+  ]);
+
   for (const tech of profile.coreTechnologies) {
     const tClean = tech.trim();
     if (tClean.length < 2) continue;
 
+    if (!QUERY_ELIGIBLE_TECHS.has(tClean.toLowerCase())) {
+      continue;
+    }
+
     // Capitalize tech nicely
-    const tCap = tClean.charAt(0).toUpperCase() + tClean.slice(1);
+    let tCap = tClean.charAt(0).toUpperCase() + tClean.slice(1);
+    if (tClean.toLowerCase() === 'node' || tClean.toLowerCase() === 'node.js' || tClean.toLowerCase() === 'nodejs') {
+      tCap = 'Node.js';
+    }
 
     if (profile.roleFamilies.includes('cross_platform_mobile') || profile.roleFamilies.includes('mobile')) {
       generatedQueriesSet.add(`${tCap} Developer`);
@@ -152,6 +181,7 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
       generatedQueriesSet.add('Mobile Developer');
       generatedQueriesSet.add('Mobile Engineer');
       generatedQueriesSet.add('Software Engineer - Mobile');
+      generatedQueriesSet.add('Cross Platform Mobile Developer');
     } else if (family === 'backend_systems' || family === 'backend') {
       generatedQueriesSet.add('Backend Engineer');
       generatedQueriesSet.add('Backend Developer');

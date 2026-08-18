@@ -131,9 +131,14 @@ export class JobService {
           totalMatches: report.jobs.length,
           country: countriesRes.join(', '),
           report,
+          discovery: report.discovery,
+          pipeline: report.pipeline,
           debug: report.debug,
           rejectionSamples: report.rejectionSamples || [],
           jobs: report.jobs,
+          recommendedJobs: report.recommendedJobs || [],
+          considerJobs: report.considerJobs || [],
+          rejectedJobs: report.rejectedJobs || [],
         };
       } catch (err: any) {
         const countriesRes = countries.map((c) => String(c));
