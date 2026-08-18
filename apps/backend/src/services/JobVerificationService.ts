@@ -673,20 +673,23 @@ export class JobVerificationService {
       const titleMatch = html.match(/<title>(.*?)<\/title>/i);
       if (titleMatch && titleMatch[1]) {
         const pageTitle = titleMatch[1].trim();
-        const lowerPageTitle = pageTitle.toLowerCase();
-        const isGenericTitle =
-          lowerPageTitle === 'careers' ||
-          lowerPageTitle.includes('careers |') ||
-          lowerPageTitle.includes('job board') ||
-          lowerPageTitle.includes('ashby') ||
-          lowerPageTitle.includes('greenhouse') ||
-          lowerPageTitle.includes('workable') ||
-          lowerPageTitle.includes('lever') ||
-          lowerPageTitle.includes('open positions') ||
-          lowerPageTitle.includes('jobs at ');
+        let cleanedTitle = pageTitle
+          .replace(/\s*[-|\u2013\u2014@]\s*(ashby|greenhouse|lever|workable|careers|job board).*/i, '')
+          .trim();
 
-        if (!isGenericTitle) {
-          detectedTitle = pageTitle;
+        const lowerCleaned = cleanedTitle.toLowerCase();
+        const isGenericTitle =
+          lowerCleaned === 'careers' ||
+          lowerCleaned === 'job board' ||
+          lowerCleaned === 'ashby' ||
+          lowerCleaned === 'greenhouse' ||
+          lowerCleaned === 'workable' ||
+          lowerCleaned === 'lever' ||
+          lowerCleaned === 'open positions' ||
+          lowerCleaned === 'jobs';
+
+        if (!isGenericTitle && cleanedTitle.length > 2) {
+          detectedTitle = cleanedTitle;
         }
       }
     }
@@ -818,6 +821,27 @@ export class JobVerificationService {
    * Saves verification result onto stored job model in database.
    */
   private async updateJobRecord(job: JobListing, result: ExternalJobVerificationResult): Promise<JobListing> {
+    console.log('[QUERY_VERIFICATION_TRACE]', JSON.stringify({
+      candidateId: job.id,
+      company: job.company,
+      originalTitle: job.title,
+      detectedTitle: result.detectedTitle || null,
+      externalTitle: result.detectedTitle || null,
+      searchQuery: result.searchRelevance?.searchQuery || null,
+      normalizedSearchQuery: (result.searchRelevance?.searchQuery || '').toLowerCase().trim(),
+      titleEvidence: result.detectedTitle ? `Page title: ${result.detectedTitle}` : 'NO_TITLE_DETECTED',
+      descriptionEvidence: job.description ? `Description length: ${job.description.length}` : 'NO_DESCRIPTION',
+      queryMatch: result.searchRelevance?.searchRelevanceVerified ?? null,
+      searchRelevanceVerified: result.searchRelevance?.searchRelevanceVerified ?? null,
+      searchRelevanceReason: result.searchRelevance?.searchRelevanceReason || null,
+      verificationStatus: result.status,
+      verificationReason: result.reason,
+      titleMatchScore: result.titleMatchScore,
+      jobIdentityReason: result.jobIdentityReason,
+      httpStatus: result.httpStatus,
+      finalUrl: result.finalUrl || job.url,
+    }, null, 2));
+
     job.verificationStatus = result.status;
     job.jobStatus = result.status;
     job.sourceVerified = result.verified;

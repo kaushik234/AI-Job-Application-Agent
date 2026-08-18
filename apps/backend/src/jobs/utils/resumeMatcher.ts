@@ -223,16 +223,28 @@ export function calculateCandidateMatchScore(job: JobListing, resume?: MasterRes
   return Math.min(99, Math.max(15, Math.round(totalScore)));
 }
 
+export interface RoleRelevanceDiagnostic {
+  isRelevant: boolean;
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  reason: string;
+}
+
 /**
- * Determines whether a job belongs to the candidate's actual career/role family.
+ * Determines whether a job belongs to the candidate's actual career/role family and returns detailed diagnostics.
  */
-export function isRoleRelevant(
+export function checkRoleRelevanceDetails(
   job: JobListing,
   resume?: MasterResume | null,
   userQuery?: string
-): boolean {
+): RoleRelevanceDiagnostic {
   if (!resume) {
-    return true;
+    return {
+      isRelevant: true,
+      matchedKeywords: ['broad_match'],
+      missingKeywords: [],
+      reason: 'No resume provided; defaulting to relevant.',
+    };
   }
 
   const title = (job.title || '').toLowerCase().trim();
@@ -251,85 +263,129 @@ export function isRoleRelevant(
     'financial analyst', 'legal counsel', 'lawyer', 'operations manager',
     'project coordinator', 'administrative', 'customer success', 'customer support',
     'technical writer', 'content writer', 'copywriter', 'technical program manager',
-    'program manager', 'product manager', 'product designer',
+    'program manager', 'product manager', 'product designer', 'sales engineer',
+    'revenue operations', 'event marketing', 'gtm strategist', 'social media manager'
   ];
 
-  if (excludedRoleTerms.some((term) => title.includes(term))) {
-    return false;
+  const matchedExcluded = excludedRoleTerms.filter((term) => title.includes(term));
+  if (matchedExcluded.length > 0) {
+    return {
+      isRelevant: false,
+      matchedKeywords: matchedExcluded,
+      missingKeywords: ['software_engineering'],
+      reason: `Excluded non-engineering role title containing "${matchedExcluded.join(', ')}"`,
+    };
   }
 
   const userQueryClean = (userQuery || '').toLowerCase().trim();
+  const mobileKeywords = ['flutter', 'dart', 'mobile', 'ios', 'android', 'swift', 'kotlin', 'cross-platform', 'react native'];
+  const matchedMobile = mobileKeywords.filter((k) => fullContent.includes(k) || title.includes(k));
+  const missingMobile = mobileKeywords.filter((k) => !matchedMobile.includes(k));
 
-  // BUG 6: CUSTOM SEARCH INTENT OVERRIDES DEFAULT PROFILE TARGET
+  // Explicit user query overrides
   if (userQueryClean.length > 0) {
-    if (userQueryClean.includes('android')) {
-      if (title.includes('android') || fullContent.includes('android')) {
-        return true;
-      }
-    }
-    if (userQueryClean.includes('ios') || userQueryClean.includes('swift')) {
-      if (title.includes('ios') || fullContent.includes('swift')) {
-        return true;
-      }
-    }
     if (userQueryClean.includes('flutter')) {
-      return title.includes('flutter') || fullContent.includes('flutter') || fullContent.includes('dart');
-    }
-    if (userQueryClean.includes('backend') || userQueryClean.includes('go') || userQueryClean.includes('python')) {
-      return title.includes('backend') || fullContent.includes('backend') || fullContent.includes(userQueryClean);
+      const isFlutterMatch = title.includes('flutter') || fullContent.includes('flutter') || fullContent.includes('dart') || title.includes('mobile');
+      if (isFlutterMatch) {
+        return {
+          isRelevant: true,
+          matchedKeywords: matchedMobile,
+          missingKeywords: missingMobile,
+          reason: 'Job content or title matches Flutter/Mobile query criteria.',
+        };
+      }
+    } else if (userQueryClean.includes('mobile')) {
+      const isMobileMatch = title.includes('mobile') || matchedMobile.length > 0 || title.includes('software engineer');
+      if (isMobileMatch) {
+        return {
+          isRelevant: true,
+          matchedKeywords: matchedMobile,
+          missingKeywords: missingMobile,
+          reason: 'Job content or title matches Mobile query criteria.',
+        };
+      }
+    } else {
+      const qTokens = userQueryClean.split(/\s+/).filter((t) => t.length > 2);
+      const isQueryMatch = qTokens.some((t) => fullContent.includes(t));
+      if (isQueryMatch) {
+        return {
+          isRelevant: true,
+          matchedKeywords: qTokens.filter((t) => fullContent.includes(t)),
+          missingKeywords: qTokens.filter((t) => !fullContent.includes(t)),
+          reason: `Job content matches query tokens "${userQueryClean}".`,
+        };
+      }
     }
   }
 
-  // WORLDWIDE MODE (or no explicit query override): ENFORCE CANDIDATE TARGET PROFILE
+  // Candidate Target Profile Matching
   const targetProfile = deriveCandidateTargetProfile(resume);
-
   const isFlutterCandidate = targetProfile.coreTechnologies.includes('flutter');
 
   if (isFlutterCandidate) {
-    const isFlutterTitle = title.includes('flutter') || title.includes('dart');
-    if (isFlutterTitle) {
-      return true;
+    const isMobileTitle =
+      title.includes('flutter') ||
+      title.includes('dart') ||
+      title.includes('mobile') ||
+      title.includes('ios') ||
+      title.includes('android') ||
+      title.includes('cross-platform') ||
+      title.includes('cross platform');
+
+    if (isMobileTitle) {
+      return {
+        isRelevant: true,
+        matchedKeywords: matchedMobile.length > 0 ? matchedMobile : ['mobile_title'],
+        missingKeywords: [],
+        reason: `Target mobile software engineering title "${job.title}" matches candidate profile.`,
+      };
     }
 
-    const isProhibitedTitle = targetProfile.prohibitedRoleTerms.some((term) => title.includes(term));
-    if (isProhibitedTitle) {
-      const hasExplicitFlutterRequirement = fullContent.includes('flutter') || fullContent.includes('dart');
-      if (!hasExplicitFlutterRequirement) {
-        return false;
+    const isGenericEngineeringTitle =
+      title.includes('software engineer') ||
+      title.includes('software developer') ||
+      title.includes('full stack') ||
+      title.includes('full-stack') ||
+      title.includes('frontend') ||
+      title.includes('application engineer');
+
+    if (isGenericEngineeringTitle) {
+      if (matchedMobile.length > 0) {
+        return {
+          isRelevant: true,
+          matchedKeywords: matchedMobile,
+          missingKeywords: [],
+          reason: `Software engineering role "${job.title}" explicitly references mobile tech (${matchedMobile.join(', ')}).`,
+        };
+      }
+      // General software engineering roles are relevant unless prohibited
+      const isProhibited = targetProfile.prohibitedRoleTerms.some((term) => title.includes(term));
+      if (!isProhibited) {
+        return {
+          isRelevant: true,
+          matchedKeywords: ['software_engineering'],
+          missingKeywords: ['mobile_specific'],
+          reason: `General software engineering role "${job.title}" is compatible with candidate profile.`,
+        };
       }
     }
-
-    const isMobileTitle = title.includes('mobile developer') || title.includes('mobile engineer') || title.includes('cross platform') || title.includes('software engineer - mobile');
-    const isGenericTitle = title.includes('software engineer') || title.includes('software developer') || title.includes('full stack') || title.includes('full-stack');
-
-    if (isMobileTitle || isGenericTitle) {
-      const hasFlutterOrDart = fullContent.includes('flutter') || fullContent.includes('dart') || fullContent.includes('cross-platform') || fullContent.includes('cross platform');
-      if (hasFlutterOrDart) {
-        return true;
-      }
-      const isExplicitlyNativeOnly = (fullContent.includes('kotlin') || fullContent.includes('aosp') || fullContent.includes('uikit')) && !hasFlutterOrDart;
-      if (isGenericTitle && !isExplicitlyNativeOnly) {
-        return true;
-      }
-      if (isMobileTitle && !isExplicitlyNativeOnly) {
-        return true;
-      }
-      return false;
-    }
-  } else {
-    const candidateSkills = [
-      ...(resume.skills?.languages || []),
-      ...(resume.skills?.frameworks || []),
-    ].map((s) => s.toLowerCase());
-
-    const hasSkillMatch = candidateSkills.some((skill) => skill.length > 2 && fullContent.includes(skill));
-    if (hasSkillMatch) return true;
   }
 
-  return false;
+  return {
+    isRelevant: false,
+    matchedKeywords: matchedMobile,
+    missingKeywords: ['flutter', 'mobile', 'software_engineer'],
+    reason: `Job title "${job.title}" does not align with candidate Mobile/Software Engineer profile.`,
+  };
 }
 
-
-
-
-
+/**
+ * Legacy boolean wrapper for role relevance.
+ */
+export function isRoleRelevant(
+  job: JobListing,
+  resume?: MasterResume | null,
+  userQuery?: string
+): boolean {
+  return checkRoleRelevanceDetails(job, resume, userQuery).isRelevant;
+}

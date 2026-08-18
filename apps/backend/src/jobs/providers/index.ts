@@ -13,3 +13,4 @@ export * from './IndeedProvider';
 export * from './LinkedInProvider';
 export * from './JobBankCanadaProvider';
 export * from './CompanyCareerPagesProvider';
+export * from './ApifyProvider';

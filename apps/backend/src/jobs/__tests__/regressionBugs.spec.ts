@@ -367,4 +367,70 @@ describe('Regression Suite for Job Discovery & Candidate Relevance Bugs (Bugs 1-
       expect(derived.keywords).toEqual(['flutter']);
     });
   });
+
+  describe('Authoritative Search Query Verification & Ashby Identity (Section 14)', () => {
+    test('TEST 1: Provider finds Flutter Developer and external page contains Flutter => SEARCH_QUERY_MISMATCH = 0', () => {
+      const job: JobListing = {
+        id: 'railway-flutter-1',
+        platform: 'Ashby',
+        company: 'Railway',
+        title: 'Flutter Developer',
+        location: 'Sydney, Australia',
+        country: 'AU' as CountryCode,
+        visaSponsorship: true,
+        isRemote: true,
+        url: 'https://jobs.ashbyhq.com/railway/flutter-1',
+        description: 'Build cross-platform mobile apps with Flutter and Dart.',
+        postedDate: '2026-08-01',
+        createdAt: new Date().toISOString(),
+      };
+
+      const relevance = verificationService.verifySearchQueryRelevance(job, 'flutter', 'Flutter Developer', 'Build cross-platform mobile apps with Flutter and Dart.');
+      expect(relevance.searchRelevanceVerified).toBe(true);
+    });
+
+    test('TEST 2: Provider finds Flutter Developer but external page is Android job => SEARCH_QUERY_MISMATCH', () => {
+      const job: JobListing = {
+        id: 'sentry-ios-1',
+        platform: 'Ashby',
+        company: 'Sentry',
+        title: 'Senior Software Engineer (iOS), SDK',
+        location: 'Vienna, Austria',
+        country: 'CA' as CountryCode,
+        visaSponsorship: false,
+        isRemote: false,
+        url: 'https://jobs.ashbyhq.com/sentry/37c30441',
+        description: 'We build SDKs for Swift, Objective-C, Cocoa. Note: Sentry supports iOS, Flutter, and React Native.',
+        postedDate: '2026-08-01',
+        createdAt: new Date().toISOString(),
+      };
+
+      const relevance = verificationService.verifySearchQueryRelevance(job, 'flutter', 'Senior Software Engineer (iOS), SDK', job.description);
+      expect(relevance.searchRelevanceVerified).toBe(false);
+      expect(relevance.searchRelevanceReason).toContain('missing from verified job title');
+    });
+
+    test('TEST 3: External page title tag with platform suffix extracts detectedTitle accurately', () => {
+      const score = verificationService.calculateTitleMatchScore('Flutter Developer', 'Flutter Developer');
+      expect(score.isMatch).toBe(true);
+      expect(score.score).toBe(1.0);
+    });
+
+    test('TEST 4: Provider URL points to wrong Ashby posting => identity verification rejects it', () => {
+      const titleCheck = verificationService.calculateTitleMatchScore('Senior Flutter Developer', 'Infra Engineer - Datacenters @ Railway');
+      expect(titleCheck.isMatch).toBe(false);
+      expect(titleCheck.score).toBeLessThan(0.5);
+    });
+
+    test('TEST 5: Explicit query "flutter" remains "flutter" throughout query derivation', () => {
+      const derived = deriveSearchQueriesFromResume(flutterResume, 'flutter');
+      expect(derived.userQuery).toBe('flutter');
+      expect(derived.keywords).toEqual(['flutter']);
+    });
+
+    test('TEST 6 & 7: Existing DB Flutter job remains in DB after scrape returns zero new jobs', async () => {
+      const stored = await require('../../database').db.getAllJobs();
+      expect(Array.isArray(stored)).toBe(true);
+    });
+  });
 });

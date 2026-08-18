@@ -166,7 +166,7 @@ export abstract class BaseJobProvider implements JobDiscoveryProvider {
   /**
    * Normalizes raw API response objects into standardized JobListing entity
    */
-  public abstract normalize(rawJobData: any): JobListing;
+  public abstract normalize(rawJobData: any): JobListing | null;
 
   /**
    * Shared helper to detect visa sponsorship keywords in description text

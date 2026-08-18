@@ -4,10 +4,9 @@
  * @architect Clean Architecture - Indeed Platform Integration
  */
 
-import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults, ProviderOutcomeStatus } from './BaseJobProvider';
+import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
-import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class IndeedProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Indeed';
@@ -16,20 +15,11 @@ export class IndeedProvider extends BaseJobProvider {
 
   public async search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
     return this.retry(async () => {
-      const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
+      const { page, limit } = this.pagination(pagination?.page, pagination?.limit);
       const publisherId = process.env.INDEED_PUBLISHER_ID;
 
-      if (!publisherId && process.env.NODE_ENV !== 'test') {
+      if (!publisherId) {
         logger.info('SEARCH', `[JOB_SOURCE] Provider: Indeed | Status: REQUIRES_API_KEY | Message: Missing INDEED_PUBLISHER_ID environment variable`);
-        const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
-        logger.info(
-          'SEARCH',
-          `[JOB_SOURCE] Provider: Indeed | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: 0`
-        );
-        logger.info(
-          'SEARCH',
-          `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: 0\nTotalAvailable: 0`
-        );
         return {
           provider: this.platform,
           totalFound: 0,
@@ -45,82 +35,69 @@ export class IndeedProvider extends BaseJobProvider {
         };
       }
 
-      let sample = [
-        this.normalize({
-          jobkey: 'ind-a810923',
-          company: 'Amazon Canada',
-          jobtitle: 'Software Development Engineer II',
-          formattedLocation: 'Vancouver, BC, Canada',
-          country: 'CA',
-          snippet: 'Amazon AWS Vancouver. Java, TypeScript, Cloud Computing.',
-        })
-      ];
-
-      if (!this.isWorldwideQuery(query) && query.countries && query.countries.length > 0) {
-        sample = sample.filter((j) => query.countries!.includes(j.country));
-      }
-
-      if (query.keywords && query.keywords.length > 0) {
-        const kw = query.keywords.map((k) => k.toLowerCase());
-        const isExplicitUserSearch = !!(query.userQuery && query.userQuery.trim().length > 0);
-        sample = sample.filter((job) => {
-          const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
-          if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
-          }
-          return (
-            kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile'].some((t) => text.includes(t))
-          );
+      // Live Indeed Publisher API call when credentials are configured
+      try {
+        const qStr = encodeURIComponent(query.q || query.userQuery || query.keywords?.join(' ') || '');
+        const res = await fetch(`https://api.indeed.com/ads/apisearch?publisher=${publisherId}&q=${qStr}&v=2&format=json`, {
+          signal: pagination?.signal,
         });
+
+        if (!res.ok) {
+          return {
+            provider: this.platform,
+            totalFound: 0,
+            page,
+            limit,
+            jobs: [],
+            outcomeStatus: 'PROVIDER_ERROR',
+            message: `Indeed API returned HTTP ${res.status}`,
+          };
+        }
+
+        const data = await res.json();
+        const rawResults = Array.isArray(data.results) ? data.results : [];
+        const normalized = rawResults.map((r: any) => this.normalize(r)).filter((j: any) => j !== null) as JobListing[];
+
+        return {
+          provider: this.platform,
+          totalFound: normalized.length,
+          page,
+          limit,
+          jobs: normalized.slice(0, limit),
+          outcomeStatus: normalized.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS',
+        };
+      } catch (err: any) {
+        return {
+          provider: this.platform,
+          totalFound: 0,
+          page,
+          limit,
+          jobs: [],
+          outcomeStatus: 'PROVIDER_ERROR',
+          message: `Indeed API fetch error: ${err.message}`,
+        };
       }
-
-      const paginatedSlice = sample.slice(offset, offset + limit);
-      const outcomeStatus: ProviderOutcomeStatus = paginatedSlice.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
-
-      const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
-      logger.info(
-        'SEARCH',
-        `[JOB_SOURCE] Provider: Indeed | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${sample.length} | Outcome: ${outcomeStatus}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: ${paginatedSlice.length}\nTotalAvailable: ${sample.length}`
-      );
-
-      return {
-        provider: this.platform,
-        totalFound: sample.length,
-        page,
-        limit,
-        jobs: paginatedSlice,
-        outcomeStatus,
-        diagnostics: {
-          query: query.q || query.userQuery || query.keywords?.join(', '),
-          rawJobs: sample.length,
-        },
-      };
     });
   }
 
-  public normalize(raw: any): JobListing {
+  public normalize(raw: any): JobListing | null {
+    if (!raw || !raw.jobtitle || !raw.company || !raw.jobkey) return null;
     return {
-      id: `indeed-${raw.jobkey || 'a810923'}`,
+      id: `indeed-${raw.jobkey}`,
       platform: this.platform,
-      company: raw.company || 'Amazon Canada',
-      title: raw.jobtitle || 'Software Engineer',
-      location: raw.formattedLocation || 'Vancouver, BC, Canada',
-      city: 'Vancouver',
-      country: 'CA',
-      salaryText: undefined,
-      visaSponsorship: true,
+      company: raw.company,
+      title: raw.jobtitle,
+      location: raw.formattedLocation || 'Worldwide',
+      city: raw.city || 'Unknown',
+      country: 'US' as any,
+      salaryText: raw.salary || undefined,
+      visaSponsorship: false,
       isRemote: true,
       isHybrid: false,
-      url: `https://www.indeed.com/viewjob?jk=${raw.jobkey || 'a810923'}`,
+      url: raw.url || `https://www.indeed.com/viewjob?jk=${raw.jobkey}`,
       description: raw.snippet || '',
-      requirements: ['TypeScript', 'Node.js', 'AWS'],
-      postedDate: normalizePostingDate(raw.formattedRelativeTime || raw.date || raw.postedDate) || '',
-      postedAt: normalizePostingDate(raw.formattedRelativeTime || raw.date || raw.postedDate),
+      requirements: [],
+      postedDate: raw.date || '',
       createdAt: new Date().toISOString(),
     };
   }

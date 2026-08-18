@@ -4,10 +4,9 @@
  * @architect Clean Architecture - LinkedIn Integration
  */
 
-import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults, ProviderOutcomeStatus } from './BaseJobProvider';
+import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults } from './BaseJobProvider';
 import { JobListing, JobPlatform } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
-import { normalizePostingDate } from '../utils/dateNormalizer';
 
 export class LinkedInProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'LinkedIn';
@@ -16,20 +15,11 @@ export class LinkedInProvider extends BaseJobProvider {
 
   public async search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
     return this.retry(async () => {
-      const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
+      const { page, limit } = this.pagination(pagination?.page, pagination?.limit);
       const apiKey = process.env.LINKEDIN_API_KEY;
 
-      if (!apiKey && process.env.NODE_ENV !== 'test') {
+      if (!apiKey) {
         logger.info('SEARCH', `[JOB_SOURCE] Provider: LinkedIn | Status: REQUIRES_API_KEY | Message: Missing LINKEDIN_API_KEY environment variable`);
-        const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
-        logger.info(
-          'SEARCH',
-          `[JOB_SOURCE] Provider: LinkedIn | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: 0`
-        );
-        logger.info(
-          'SEARCH',
-          `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: 0\nTotalAvailable: 0`
-        );
         return {
           provider: this.platform,
           totalFound: 0,
@@ -37,7 +27,7 @@ export class LinkedInProvider extends BaseJobProvider {
           limit,
           jobs: [],
           outcomeStatus: 'AUTH_REQUIRED',
-          message: 'Missing LINKEDIN_API_KEY environment variable. Direct portal API access requires licensed API key or partner integration.',
+          message: 'Missing LINKEDIN_API_KEY environment variable. Direct portal API access requires licensed API key.',
           diagnostics: {
             query: query.q || query.userQuery || query.keywords?.join(', '),
             authState: 'MISSING_API_KEY',
@@ -45,83 +35,70 @@ export class LinkedInProvider extends BaseJobProvider {
         };
       }
 
-      let sample = [
-        this.normalize({
-          jobId: '391029318',
-          companyName: 'Personio',
-          title: 'Full Stack Engineer - HR Automation Suite',
-          location: 'Munich, Germany',
-          countryCode: 'DE',
-          link: 'https://www.linkedin.com/jobs/view/391029318',
-          descriptionText: 'Personio HR platform. React, TypeScript, GraphQL. Full visa sponsorship provided.',
-        })
-      ];
-
-      if (!this.isWorldwideQuery(query) && query.countries && query.countries.length > 0) {
-        sample = sample.filter((j) => query.countries!.includes(j.country));
-      }
-
-      if (query.keywords && query.keywords.length > 0) {
-        const kw = query.keywords.map((k) => k.toLowerCase());
-        const isExplicitUserSearch = !!(query.userQuery && query.userQuery.trim().length > 0);
-        sample = sample.filter((job) => {
-          const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
-          if (isExplicitUserSearch) {
-            return kw.some((k) => text.includes(k));
-          }
-          return (
-            kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile'].some((t) => text.includes(t))
-          );
+      // Live LinkedIn API call when credentials are configured
+      try {
+        const qStr = encodeURIComponent(query.q || query.userQuery || query.keywords?.join(' ') || '');
+        const res = await fetch(`https://api.linkedin.com/v2/jobSearch?q=${qStr}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: pagination?.signal,
         });
+
+        if (!res.ok) {
+          return {
+            provider: this.platform,
+            totalFound: 0,
+            page,
+            limit,
+            jobs: [],
+            outcomeStatus: 'PROVIDER_ERROR',
+            message: `LinkedIn API returned HTTP ${res.status}`,
+          };
+        }
+
+        const data = await res.json();
+        const rawResults = Array.isArray(data.elements) ? data.elements : [];
+        const normalized = rawResults.map((r: any) => this.normalize(r)).filter((j: any) => j !== null) as JobListing[];
+
+        return {
+          provider: this.platform,
+          totalFound: normalized.length,
+          page,
+          limit,
+          jobs: normalized.slice(0, limit),
+          outcomeStatus: normalized.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS',
+        };
+      } catch (err: any) {
+        return {
+          provider: this.platform,
+          totalFound: 0,
+          page,
+          limit,
+          jobs: [],
+          outcomeStatus: 'PROVIDER_ERROR',
+          message: `LinkedIn API fetch error: ${err.message}`,
+        };
       }
-
-      const paginatedSlice = sample.slice(offset, offset + limit);
-      const outcomeStatus: ProviderOutcomeStatus = paginatedSlice.length > 0 ? 'SUCCESS_WITH_RESULTS' : 'SUCCESS_ZERO_RESULTS';
-
-      const countryLog = this.isWorldwideQuery(query) ? 'WORLDWIDE' : query.countries?.join(', ') || 'WORLDWIDE';
-      logger.info(
-        'SEARCH',
-        `[JOB_SOURCE] Provider: LinkedIn | Query: ${query.keywords?.join(', ') || 'All'} | Country: ${countryLog} | Jobs fetched: ${sample.length} | Outcome: ${outcomeStatus}`
-      );
-      logger.info(
-        'SEARCH',
-        `[JOB_PAGINATION]\nProvider: ${this.platform}\nPage: ${page}\nRequested: ${limit}\nReturned: ${paginatedSlice.length}\nTotalAvailable: ${sample.length}`
-      );
-
-      return {
-        provider: this.platform,
-        totalFound: sample.length,
-        page,
-        limit,
-        jobs: paginatedSlice,
-        outcomeStatus,
-        diagnostics: {
-          query: query.q || query.userQuery || query.keywords?.join(', '),
-          rawJobs: sample.length,
-        },
-      };
     });
   }
 
-  public normalize(raw: any): JobListing {
+  public normalize(raw: any): JobListing | null {
+    if (!raw || !raw.title || !raw.companyName || !raw.jobId) return null;
     return {
-      id: `li-${raw.jobId || '391029318'}`,
+      id: `li-${raw.jobId}`,
       platform: this.platform,
-      company: raw.companyName || 'LinkedIn Partner',
-      title: raw.title || 'Full Stack Engineer',
-      location: raw.location || 'Munich, Germany',
-      city: 'Munich',
-      country: 'DE',
+      company: raw.companyName,
+      title: raw.title,
+      location: raw.location || 'Worldwide',
+      city: 'Unknown',
+      country: 'US' as any,
       salaryText: undefined,
-      visaSponsorship: true,
+      visaSponsorship: false,
       isRemote: true,
       isHybrid: false,
-      url: raw.link || 'https://www.linkedin.com/jobs/view/391029318',
+      url: raw.link || `https://www.linkedin.com/jobs/view/${raw.jobId}`,
       description: raw.descriptionText || '',
-      requirements: ['React', 'TypeScript', 'GraphQL'],
-      postedDate: normalizePostingDate(raw.postedDate || raw.listedAt || raw.createdAt) || '',
-      postedAt: normalizePostingDate(raw.postedDate || raw.listedAt || raw.createdAt),
+      requirements: [],
+      postedDate: raw.postedDate || '',
       createdAt: new Date().toISOString(),
     };
   }

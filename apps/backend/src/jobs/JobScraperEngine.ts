@@ -20,12 +20,14 @@ import {
   LinkedInProvider,
   JobBankCanadaProvider,
   CompanyCareerPagesProvider,
+  ApifyProvider,
 } from './providers';
 import { deduplicateJobs } from './utils/deduplication';
 import { deriveSearchQueriesFromResume } from './utils/queryGenerator';
 import {
   calculateCandidateMatchScore,
   isRoleRelevant,
+  checkRoleRelevanceDetails,
   deriveCandidateTargetProfile,
 } from './utils/resumeMatcher';
 import { jobEvaluationService } from '../services/JobEvaluationService';
@@ -33,6 +35,7 @@ import { jobRankingService } from '../services/JobRankingService';
 import { db } from '../database';
 import { logger } from '@sentinel/shared';
 import { jobVerificationService } from '../services/JobVerificationService';
+import { jobDeduplicationService } from '../services/JobDeduplicationService';
 
 export interface SearchEngineCrawlReport {
   mode: 'WORLDWIDE' | 'CUSTOM';
@@ -50,6 +53,36 @@ export interface SearchEngineCrawlReport {
     }
   >;
   rejectionStats: Record<string, number>;
+  rejectionDiagnostics?: Array<{
+    jobId: string;
+    title: string;
+    company: string;
+    location: string;
+    provider: string;
+    query: string;
+    stage: string;
+    titleMatchScore?: number;
+    matchedKeywords: string[];
+    missingKeywords: string[];
+    rejectionReason: string;
+  }>;
+  debug: {
+    queriesGenerated: string[];
+    rawJobsCollected: number;
+    afterQueryFilter: number;
+    afterRoleRelevance: number;
+    afterLocationFilter: number;
+    afterVerification: number;
+    finalJobs: number;
+  };
+  rejectionSamples: Array<{
+    jobId: string;
+    title: string;
+    company: string;
+    provider: string;
+    stage: string;
+    reason: string;
+  }>;
   jobs: JobListing[];
 }
 
@@ -70,6 +103,7 @@ export class JobScraperEngine {
       new LinkedInProvider(),
       new JobBankCanadaProvider(),
       new CompanyCareerPagesProvider(),
+      new ApifyProvider(),
     ];
   }
 
@@ -122,13 +156,19 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
-    const PRIMARY_DISCOVERY_QUERY_LIMIT = 5;
+    const defaultMobileQueries = [
+      'Flutter Developer',
+      'Flutter Engineer',
+      'Mobile Developer',
+      'Mobile Engineer',
+      'Software Engineer - Mobile',
+      'Android Developer',
+      'iOS Developer',
+    ];
 
     const activeSubQueries = derived.userQuery
-      ? [derived.userQuery]
-      : (derived.primaryQueries && derived.primaryQueries.length > 0
-          ? derived.primaryQueries.slice(0, PRIMARY_DISCOVERY_QUERY_LIMIT)
-          : (derived.keywords || ['Software Engineer']).slice(0, PRIMARY_DISCOVERY_QUERY_LIMIT));
+      ? Array.from(new Set([derived.userQuery, ...defaultMobileQueries]))
+      : Array.from(new Set([...(derived.primaryQueries || []), ...defaultMobileQueries]));
 
     // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {
@@ -142,59 +182,52 @@ export class JobScraperEngine {
         logger.info('SEARCH', `[PROVIDER_START] provider=${provider.platform}`);
         const providerJobs: JobListing[] = [];
         const seenIds = new Set<string>();
+
+        const currentSearchQuery: JobSearchQuery = {
+          ...searchQuery,
+          q: derived.userQuery || activeSubQueries[0],
+          userQuery: derived.userQuery,
+          keywords: activeSubQueries,
+        };
+
+        if (!provider.supports(currentSearchQuery)) {
+          clearTimeout(timeoutId);
+          return [] as JobListing[];
+        }
+
+        let currentPage = pagination.page || 1;
+        let pagesFetched = 0;
         let lastResult: PaginatedJobResults | null = null;
 
-        for (const subQuery of activeSubQueries) {
+        while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
           if (controller.signal.aborted) break;
-          if (providerJobs.length >= targetCollectionLimit) break;
 
-          const currentSearchQuery: JobSearchQuery = {
-            ...searchQuery,
-            q: subQuery,
-            userQuery: subQuery,
-            keywords: [subQuery],
-          };
+          logger.info('SEARCH', `[DISCOVERY_START] provider=${provider.platform} query="${activeSubQueries.join(', ')}" page=${currentPage}`);
+          const result = await provider.search(currentSearchQuery, {
+            page: currentPage,
+            limit: pageLimit,
+            signal: controller.signal,
+          });
+          lastResult = result;
+          pagesFetched++;
 
-          if (!provider.supports(currentSearchQuery)) continue;
-
-          let currentPage = pagination.page || 1;
-          let pagesFetched = 0;
-
-          while (pagesFetched < maxPagesSafetyLimit && providerJobs.length < targetCollectionLimit) {
-            if (controller.signal.aborted) break;
-
-            logger.info('SEARCH', `[DISCOVERY_START] provider=${provider.platform} query="${subQuery}" page=${currentPage}`);
-            const result = await provider.search(currentSearchQuery, {
-              page: currentPage,
-              limit: pageLimit,
-              signal: controller.signal,
-            });
-            lastResult = result;
-            pagesFetched++;
-
-            if (!result || !result.jobs || result.jobs.length === 0) {
-              break;
-            }
-
-            logger.info(
-              'SEARCH',
-              `[DISCOVERY_PROVIDER] provider=${provider.platform} query="${subQuery}" page=${currentPage} fetched=${result.jobs.length}`
-            );
-
-            for (const job of result.jobs) {
-              const key = job.id || job.url;
-              if (!seenIds.has(key)) {
-                seenIds.add(key);
-                providerJobs.push(job);
-              }
-            }
-
-            if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
-              break;
-            }
-
-            currentPage++;
+          if (!result || !result.jobs || result.jobs.length === 0) {
+            break;
           }
+
+          for (const job of result.jobs) {
+            const key = job.id || job.url;
+            if (!seenIds.has(key)) {
+              seenIds.add(key);
+              providerJobs.push(job);
+            }
+          }
+
+          if (result.jobs.length < result.limit || (result.totalFound > 0 && currentPage * result.limit >= result.totalFound)) {
+            break;
+          }
+
+          currentPage++;
         }
 
         clearTimeout(timeoutId);
@@ -212,11 +245,6 @@ export class JobScraperEngine {
         logger.info(
           'SEARCH',
           `[PROVIDER_TRACE]\nprovider=${provider.platform}\nquery="${activeSubQueries.join(', ')}"\nrawJobs=${providerJobs.length}\nstatus=${outcome}\nmessage=${lastResult?.message || ''}`
-        );
-
-        logger.info(
-          'SEARCH',
-          `[DISCOVERY_RESPONSE] provider=${provider.platform} count=${providerJobs.length} outcome=${outcome}`
         );
 
         providerBreakdown[provider.platform] = {
@@ -258,22 +286,11 @@ export class JobScraperEngine {
       }
     });
 
-    // Provider audit logging
-    Object.entries(providerBreakdown).forEach(([platform, data]) => {
-      logger.info('SEARCH', `[JOB_SCRAPE] ${platform} raw jobs: ${data.scraped}`);
-    });
-    logger.info('SEARCH', `[JOB_SCRAPE] Total raw jobs: ${rawJobs.length}`);
+    logger.info('SEARCH', `[JOB_SCRAPE] Total raw jobs collected across ${activeSubQueries.length} queries: ${rawJobs.length}`);
 
-    // 5. Deduplicate across platforms for current scrape
-    const { jobDeduplicationService } = require('../services/JobDeduplicationService');
+    // 5. STEP 1: Deduplicate across queries & providers
     const deduplicated = jobDeduplicationService.deduplicateJobs(rawJobs);
     const duplicatesRemovedCount = rawJobs.length - deduplicated.length;
-
-    // 6. External verification of every deduplicated job
-    logger.info(
-      'SEARCH',
-      `[JOB_VERIFICATION] Verifying ${deduplicated.length} deduplicated jobs before ranking/saving`
-    );
 
     const rejectionStats: Record<string, number> = {
       SOURCE_MISMATCH: 0,
@@ -288,164 +305,177 @@ export class JobScraperEngine {
       OTHER: 0,
     };
 
-    const verifiedActiveJobs: JobListing[] = [];
+    const rejectionDiagnostics: Array<{
+      jobId: string;
+      title: string;
+      company: string;
+      location: string;
+      provider: string;
+      query: string;
+      stage: string;
+      titleMatchScore?: number;
+      matchedKeywords: string[];
+      missingKeywords: string[];
+      rejectionReason: string;
+    }> = [];
 
-    for (const job of deduplicated) {
-      try {
-        const verifiedJob = await jobVerificationService.verifyJobListing(job, query.q || query.userQuery);
+    const rejectionSamples: Array<{
+      jobId: string;
+      title: string;
+      company: string;
+      provider: string;
+      stage: string;
+      reason: string;
+    }> = [];
 
-        if (
-          verifiedJob.sourceVerified === true &&
-          verifiedJob.verificationStatus === 'ACTIVE' &&
-          verifiedJob.jobIdentityVerified !== false
-        ) {
-          verifiedActiveJobs.push(verifiedJob);
-        } else {
-          const statusKey = String(verifiedJob.verificationStatus || 'OTHER');
-          if (statusKey in rejectionStats) {
-            rejectionStats[statusKey]++;
-          } else {
-            rejectionStats.OTHER++;
-          }
-          logger.info(
-            'SEARCH',
-            `[JOB_VERIFICATION] Excluded ${job.company} - ${job.title}: ${verifiedJob.verificationReason || verifiedJob.verificationStatus}`
-          );
-        }
-      } catch (err: any) {
-        rejectionStats.OTHER++;
-        logger.error(
-          'ERROR',
-          `[JOB_VERIFICATION] Failed for ${job.company} - ${job.title}: ${err.message}`
-        );
+    const logRejection = (job: JobListing, stage: string, reason: string, matchedKw: string[] = [], missingKw: string[] = [], titleScore?: number) => {
+      const diag = {
+        jobId: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        provider: job.platform,
+        query: derived.userQuery || 'All',
+        stage,
+        titleMatchScore: titleScore ?? 1.0,
+        matchedKeywords: matchedKw,
+        missingKeywords: missingKw,
+        rejectionReason: reason,
+      };
+      rejectionDiagnostics.push(diag);
+      if (rejectionSamples.length < 20) {
+        rejectionSamples.push({
+          jobId: job.id,
+          title: job.title,
+          company: job.company,
+          provider: job.platform,
+          stage,
+          reason,
+        });
       }
-    }
+      console.log(`[REJECTION_DIAGNOSTIC] ${JSON.stringify(diag, null, 2)}`);
+    };
 
-    // 7. Post-verification Country Filter (Phase 7)
-    let countryFilteredJobs = verifiedActiveJobs;
-    if (!isWorldwide && query.countries && query.countries.length > 0) {
-      const allowedCountries = query.countries;
-      countryFilteredJobs = verifiedActiveJobs.filter((j) => {
-        const match = allowedCountries.includes(j.country as any) || (j.verifiedCountry && allowedCountries.includes(j.verifiedCountry as any));
-        if (!match) {
-          rejectionStats.COUNTRY_MISMATCH++;
-          logger.info('SEARCH', `[COUNTRY_FILTER] Excluded ${j.company} - ${j.title} (Location: ${j.location}, Verified Country: ${j.country}) because not in allowed countries [${allowedCountries.join(', ')}]`);
-        }
-        return match;
-      });
-    }
-
-    // 8. Search Query Relevance Filter (Phase 1)
-    let searchRelevantJobs = countryFilteredJobs;
-    const userSearchTerm = (query.q || query.userQuery || '').trim();
-    if (userSearchTerm && userSearchTerm !== 'ALL' && userSearchTerm !== 'WORLDWIDE') {
-      searchRelevantJobs = countryFilteredJobs.filter((j) => {
-        const rel = jobVerificationService.verifySearchQueryRelevance(j, userSearchTerm, j.detectedTitle || j.title, j.description);
-        j.searchRelevance = rel;
-        if (!rel.searchRelevanceVerified) {
-          rejectionStats.SEARCH_QUERY_MISMATCH++;
-          logger.info('SEARCH', `[SEARCH_RELEVANCE] Excluded ${j.company} - ${j.title}: ${rel.searchRelevanceReason}`);
-          return false;
-        }
-        return true;
-      });
-    }
-
-    console.log('[SCRAPE_TRACE] [3] VERIFICATION & RELEVANCE', {
-      stage: 'VERIFICATION',
-      rawCount: rawJobs.length,
-      deduplicatedCount: deduplicated.length,
-      verifiedActiveCount: verifiedActiveJobs.length,
-      countryFilteredCount: countryFilteredJobs.length,
-      searchRelevantCount: searchRelevantJobs.length,
-      rejectionStats,
-      jobIds: searchRelevantJobs.map((j) => j.id),
-    });
-
-    // 9. Filter verified + relevant jobs by candidate role relevance
+    // 6. STEP 2: Role Relevance Filter (Phase 2 & Task 4)
     const roleRelevantJobs: JobListing[] = [];
-    const candidateTarget = deriveCandidateTargetProfile(masterResume);
-
-    for (const job of searchRelevantJobs) {
-      const relevant = isRoleRelevant(job, masterResume, userSearchTerm);
-      const ranking = jobRankingService.rankJob(job, masterResume);
-
-      const decisionStr =
-        job.sourceVerified === true &&
-        job.verificationStatus === 'ACTIVE' &&
-        relevant
-          ? 'ACCEPT'
-          : (!relevant ? 'REJECT_ROLE_NOT_RELEVANT' : `REJECT_${job.verificationStatus}`);
-
-      logger.info(
-        'SEARCH',
-        `[JOB_DECISION]\ncompany=${job.company}\ntitle=${job.title}\nmode=${mode}\ndiscoveryQuery="${(job as any).discoveryQuery || ''}"\nuserQuery="${userSearchTerm}"\ncandidatePrimaryRole="${candidateTarget.primaryRoles.join(', ')}"\ncandidateCoreTechnologies="${candidateTarget.coreTechnologies.join(',')}"\nsearchRelevant=${job.searchRelevance?.searchRelevanceVerified ?? true}\nroleRelevant=${relevant}\nmatchedCoreSkills=${ranking.strengths.length}\nmissingCoreSkills="${ranking.missingSkills.join(',')}"\nverifiedCountry=${job.verifiedCountry || job.country}\napplyability=${job.applyabilityStatus || 'UNVERIFIED'}\nrecommendation=${ranking.recommendation}\nfinalDecision=${decisionStr}`
-      );
-
-      if (relevant) {
+    for (const job of deduplicated) {
+      const roleDiag = checkRoleRelevanceDetails(job, masterResume, derived.userQuery);
+      if (roleDiag.isRelevant) {
         roleRelevantJobs.push(job);
       } else {
         rejectionStats.ROLE_NOT_RELEVANT++;
-        logger.info(
-          'SEARCH',
-          `[JOB_RELEVANCE] Excluded ${job.company} - ${job.title}: role is not relevant to candidate profile`
-        );
+        logRejection(job, 'ROLE_NOT_RELEVANT', roleDiag.reason, roleDiag.matchedKeywords, roleDiag.missingKeywords);
       }
     }
 
-    logger.info(
-      'SEARCH',
-      `[JOB_RELEVANCE] Relevant jobs: ${roleRelevantJobs.length}/${searchRelevantJobs.length}`,
-    );
+    // 7. STEP 3: Country & Location Compatibility Filter (Phase 7 & Task 3)
+    const countryFilteredJobs: JobListing[] = [];
+    if (!isWorldwide && query.countries && query.countries.length > 0) {
+      const allowedCountries = query.countries.map((c) => String(c).toUpperCase());
+      for (const job of roleRelevantJobs) {
+        const canonical = jobVerificationService.deriveCanonicalCountry(job.location, job.country);
+        job.verifiedCountry = canonical.country as any;
+        const isMatch = allowedCountries.includes(canonical.country.toUpperCase());
+        if (isMatch) {
+          countryFilteredJobs.push(job);
+        } else {
+          rejectionStats.COUNTRY_MISMATCH++;
+          logRejection(
+            job,
+            'COUNTRY_MISMATCH',
+            `Canonical country "${canonical.country}" derived from location "${job.location}" is not in allowed target countries [${allowedCountries.join(', ')}]`,
+            [canonical.country],
+            allowedCountries
+          );
+        }
+      }
+    } else {
+      countryFilteredJobs.push(...roleRelevantJobs);
+    }
 
-    // 10. Calculate candidate ranking only for verified + search-relevant + role-relevant jobs
-    const scoredRawJobs = jobRankingService.rankJobs(
-      roleRelevantJobs,
-      masterResume,
-    );
+    // 8. STEP 4: Live External Source Verification & Search Query Gate (Phase 6 & Task 6)
+    const verifiedActiveJobs: JobListing[] = [];
+    const userSearchTerm = (query.q || query.userQuery || '').trim();
 
-    console.log('[SCRAPE_TRACE] [4] RANKING', {
-      stage: 'RANKING',
-      jobsCount: scoredRawJobs.length,
-      verifiedCount: verifiedActiveJobs.length,
-      finalCount: scoredRawJobs.length,
-      jobIds: scoredRawJobs.map((j) => j.id),
-    });
+    // Optimize verification speed: Verify top 30 candidate jobs in parallel chunks of 10
+    const candidatesToVerify = countryFilteredJobs.slice(0, 30);
+    const chunkSize = 10;
 
-    // 8. Persist only verified active jobs
+    for (let i = 0; i < candidatesToVerify.length; i += chunkSize) {
+      const chunk = candidatesToVerify.slice(i, i + chunkSize);
+      const chunkResults = await Promise.allSettled(
+        chunk.map(async (job) => {
+          try {
+            const verifiedJob = await jobVerificationService.verifyJobListing(job, userSearchTerm);
+            return { job, verifiedJob, error: null };
+          } catch (err: any) {
+            return { job, verifiedJob: null, error: err };
+          }
+        })
+      );
+
+      for (const res of chunkResults) {
+        if (res.status === 'fulfilled' && res.value) {
+          const { job, verifiedJob, error } = res.value;
+          if (error) {
+            rejectionStats.OTHER++;
+            logRejection(job, 'VERIFICATION_ERROR', error.message);
+          } else if (verifiedJob) {
+            if (
+              verifiedJob.sourceVerified === true &&
+              verifiedJob.verificationStatus === 'ACTIVE' &&
+              verifiedJob.jobIdentityVerified !== false
+            ) {
+              verifiedActiveJobs.push(verifiedJob);
+            } else {
+              const statusKey = String(verifiedJob.verificationStatus || 'OTHER');
+              if (statusKey in rejectionStats) {
+                rejectionStats[statusKey]++;
+              } else {
+                rejectionStats.OTHER++;
+              }
+              logRejection(
+                job,
+                statusKey,
+                verifiedJob.verificationReason || `External verification failed with status ${verifiedJob.verificationStatus}`,
+                [],
+                [],
+                (verifiedJob as any).titleMatchScore
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // 9. STEP 5: Candidate Matching & Ranking (Phase 4 & Task 3)
+    const scoredRawJobs = jobRankingService.rankJobs(verifiedActiveJobs, masterResume);
+
+    const debug = {
+      queriesGenerated: activeSubQueries,
+      rawJobsCollected: rawJobs.length,
+      afterQueryFilter: deduplicated.length,
+      afterRoleRelevance: roleRelevantJobs.length,
+      afterLocationFilter: countryFilteredJobs.length,
+      afterVerification: verifiedActiveJobs.length,
+      finalJobs: scoredRawJobs.length,
+    };
+
+    console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
+
+    // 10. Persist only verified active jobs
     if (scoredRawJobs.length > 0) {
       await this.jobRepo.saveMany(scoredRawJobs);
-      console.log('[SCRAPE_TRACE] [5] REPOSITORY INSERT', {
-        stage: 'REPOSITORY_INSERT',
-        insertedCount: scoredRawJobs.length,
-        jobIds: scoredRawJobs.map((j) => j.id),
-      });
-
-      const repoVerification = await this.jobRepo.findJobs();
-      console.log('[SCRAPE_TRACE] [6] REPOSITORY QUERY', {
-        stage: 'REPOSITORY_QUERY',
-        jobsCount: repoVerification.length,
-        jobIds: repoVerification.filter((j) => scoredRawJobs.some((s) => s.id === j.id)).map((j) => j.id),
-      });
     }
 
     // 8. Top 50 jobs ordered by priority and matchScore
     const top50Jobs = scoredRawJobs.slice(0, 50);
 
     logger.info('SEARCH', `[JOB_DEDUP] After deduplication: ${deduplicated.length}`);
-    logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${deduplicated.length}`);
-    logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${searchRelevantJobs.length}`);
+    logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${deduplicated.length}`);
+    logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${countryFilteredJobs.length}`);
     logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
     logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length}`);
-
-    console.log('[SCRAPE_TRACE] [2] DISCOVERY ENGINE RETURN', {
-      stage: 'DISCOVERY_ENGINE_RETURN',
-      jobsCount: top50Jobs.length,
-      rawCount: rawJobs.length,
-      totalUniqueNew: scoredRawJobs.length,
-      providerBreakdown,
-      jobIds: top50Jobs.map((j) => j.id),
-    });
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,
@@ -463,6 +493,9 @@ export class JobScraperEngine {
       providersProcessed: this.providers.length,
       providerBreakdown,
       rejectionStats,
+      rejectionDiagnostics,
+      debug,
+      rejectionSamples,
       jobs: top50Jobs,
     };
   }

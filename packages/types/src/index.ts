@@ -46,7 +46,8 @@ export type JobPlatform =
   | 'Seek'
   | 'Indeed'
   | 'Job Bank Canada'
-  | 'Company Career Page';
+  | 'Company Career Page'
+  | 'Apify';
 
 /** Configurable Evaluation Scoring Weights */
 export interface EvaluationWeights {

@@ -19,6 +19,12 @@ export class JobController {
     return this.jobService.getJobs();
   }
 
+  @Post('discover')
+  @ApiOperation({ summary: 'Trigger fresh target job discovery' })
+  async discoverJobs(@Body() dto: ScrapeJobsDto) {
+    return this.triggerScrape(dto);
+  }
+
   @Post('scrape')
   @ApiOperation({ summary: 'Trigger job discovery scraper for target country' })
   async triggerScrape(@Body() dto: ScrapeJobsDto) {

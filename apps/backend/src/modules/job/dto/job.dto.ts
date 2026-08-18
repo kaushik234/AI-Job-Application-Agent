@@ -18,10 +18,20 @@ export class ScrapeJobsDto {
   @IsString()
   query?: string;
 
+  @ApiProperty({ required: false, example: 'Flutter Developer' })
+  @IsOptional()
+  @IsString()
+  userQuery?: string;
+
   @ApiProperty({ required: false, example: 'ALL' })
   @IsOptional()
   @IsString()
   country?: string;
+
+  @ApiProperty({ required: false, example: 'ALL' })
+  @IsOptional()
+  @IsString()
+  countryCode?: string;
 
   @ApiProperty({ type: [String], required: false, example: ['AU', 'CA', 'DE'] })
   @IsOptional()
@@ -47,6 +57,21 @@ export class ScrapeJobsDto {
   @IsOptional()
   @IsArray()
   keywords?: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  mode?: string;
 }
 
 export class JobResponseDto {

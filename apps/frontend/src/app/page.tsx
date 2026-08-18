@@ -87,11 +87,6 @@ const MainAppContent: React.FC = () => {
         return res.data;
       };
 
-      const jobsData = extractPayload(jobsRes);
-      if (Array.isArray(jobsData) && !isLiveScrapeActiveRef.current) {
-        setJobs(jobsData);
-      }
-
       const appsData = extractPayload(appsRes);
       if (Array.isArray(appsData)) setApplications(appsData);
 
@@ -130,7 +125,7 @@ const MainAppContent: React.FC = () => {
   const handleSearchJobs = async (filters: { query?: string; countries?: CountryCode[]; visaOnly?: boolean; remoteOnly?: boolean }) => {
     setIsSearching(true);
     isLiveScrapeActiveRef.current = true;
-    console.log('[JOB_UI] Search query:', filters.query || 'None');
+    console.log('[TARGET_JOBS] Discovery started');
     try {
       const payload = {
         q: filters.query,
@@ -140,33 +135,27 @@ const MainAppContent: React.FC = () => {
         remoteOnly: filters.remoteOnly === true,
       };
 
-      const res = await api.post('/jobs/scrape', payload, { timeout: 60000 });
-      const jobsData = Array.isArray(res.data?.jobs)
+      const res = await api.post('/jobs/discover', payload, { timeout: 60000 });
+      console.log('[TARGET_JOBS] Discovery completed');
+
+      const freshJobs = Array.isArray(res.data?.jobs)
         ? res.data.jobs
         : Array.isArray(res.data?.report?.jobs)
         ? res.data.report.jobs
-        : Array.isArray(res.data?.data?.jobs)
-        ? res.data.data.jobs
-        : Array.isArray(res.data?.data)
-        ? res.data.data
-        : Array.isArray(res.data)
-        ? res.data
         : [];
 
-      console.log('[JOB_UI] API response jobs:', jobsData.length);
+      console.log(`[TARGET_JOBS] Received ${freshJobs.length} verified jobs`);
+      console.log(`[TARGET_JOBS] Rendering ${freshJobs.length} fresh jobs`);
 
-      if (jobsData.length > 0) {
-        setJobs(jobsData);
-      } else {
-        console.log('[JOB_UI] Fresh scrape returned 0 jobs — preserving previously verified live jobs from database');
-        await fetchAllData();
-      }
+      setJobs(freshJobs);
     } catch (err) {
-      console.error('Job scrape and match failed:', err);
-      isLiveScrapeActiveRef.current = false;
-      await fetchAllData();
+      console.error('[TARGET_JOBS] Discovery failed:', err);
+      console.log('[TARGET_JOBS] Received 0 verified jobs');
+      console.log('[TARGET_JOBS] Rendering 0 fresh jobs');
+      setJobs([]);
     } finally {
       setIsSearching(false);
+      isLiveScrapeActiveRef.current = false;
     }
   };
 

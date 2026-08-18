@@ -57,9 +57,17 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [autofillAnalysis, setAutofillAnalysis] = useState<any>(null);
 
   // Job Mode & Source Debug states
-  const [modeFilter, setModeFilter] = useState<'LIVE' | 'DEMO' | 'ALL'>('LIVE');
   const [debugJobId, setDebugJobId] = useState<string | null>(null);
   const [debugSourceData, setDebugSourceData] = useState<any>(null);
+
+  const hasDiscoveredOnMountRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!hasDiscoveredOnMountRef.current) {
+      hasDiscoveredOnMountRef.current = true;
+      onSearch({ query: '', countries: selectedCountries, visaOnly, remoteOnly });
+    }
+  }, []);
 
   const handleCountryToggle = (code: CountryCode) => {
     if (code === ('ALL' as CountryCode)) {
@@ -320,50 +328,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 })}
               </div>
 
-              {/* Mode Toggle: LIVE JOBS vs DEMO JOBS */}
-              <div className="flex items-center space-x-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setModeFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    modeFilter === 'ALL' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  All ({jobs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModeFilter('LIVE')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    modeFilter === 'LIVE' ? 'bg-emerald-600 text-white shadow' : 'text-emerald-400 hover:text-emerald-300'
-                  }`}
-                >
-                  🟢 Live Jobs ({
-                    jobs.filter((j) => {
-                      const companyLower = (j.company || '').toLowerCase();
-                      const idLower = (j.id || '').toLowerCase();
-                      const isSynthetic =
-                        j.isDemoJob === true ||
-                        j.jobStatus === 'DEMO_ONLY' ||
-                        j.verificationStatus === 'DEMO_ONLY' ||
-                        idLower.includes('demo') ||
-                        idLower.includes('mock') ||
-                        companyLower.includes('demo technologies');
-                      const isMismatch = j.verificationStatus === 'SOURCE_MISMATCH' || j.jobStatus === 'SOURCE_MISMATCH';
-                      const isExpired = j.verificationStatus === 'EXPIRED' || j.jobStatus === 'EXPIRED';
-                      return (j.jobStatus === 'ACTIVE' || j.verificationStatus === 'ACTIVE' || j.sourceVerified === true) && !isSynthetic && !isMismatch && !isExpired;
-                    }).length
-                  })
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModeFilter('DEMO')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
-                    modeFilter === 'DEMO' ? 'bg-blue-600 text-white shadow' : 'text-blue-400 hover:text-blue-300'
-                  }`}
-                >
-                  🔵 Demo Jobs ({jobs.filter((j) => j.isDemoJob || j.jobStatus === 'DEMO_ONLY').length})
-                </button>
+              {/* Verified Live Jobs Counter */}
+              <div className="flex items-center space-x-1.5 bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-semibold text-emerald-400">
+                <span>🟢 Verified Live Jobs ({jobs.length})</span>
               </div>
             </div>
           </form>
@@ -378,55 +345,26 @@ export const JobsView: React.FC<JobsViewProps> = ({
         </div>
       )}
 
-      {/* Job Grid */}
+      {/* Job Grid / Loading / Empty State */}
       {(() => {
-        const searchLower = query.toLowerCase().trim();
-        const filteredJobs = jobs.filter((j) => {
-          const companyLower = (j.company || '').toLowerCase();
-          const titleLower = (j.title || '').toLowerCase();
-          const platformLower = (j.platform || '').toLowerCase();
-          const descLower = (j.description || '').toLowerCase();
-          const idLower = (j.id || '').toLowerCase();
+        if (isSearching) {
+          return (
+            <div className="p-12 text-center border border-dashed border-blue-500/30 rounded-xl bg-blue-500/5 space-y-3">
+              <Sparkles className="w-10 h-10 text-blue-400 mx-auto animate-spin" />
+              <h3 className="text-lg font-semibold text-slate-200">Discovering fresh jobs...</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Sentinel is executing live provider discovery across active ATS platforms & Apify endpoints.
+              </p>
+              <div className="pt-2 flex items-center justify-center space-x-4 text-[11px] text-slate-400">
+                <span>Providers Active: 10</span>
+                <span>•</span>
+                <span>Verification: Strict</span>
+              </div>
+            </div>
+          );
+        }
 
-          const isSynthetic =
-            j.isDemoJob === true ||
-            j.jobStatus === 'DEMO_ONLY' ||
-            j.verificationStatus === 'DEMO_ONLY' ||
-            idLower.includes('demo') ||
-            idLower.includes('mock') ||
-            idLower.includes('e2e') ||
-            companyLower.includes('demo technologies') ||
-            companyLower.includes('company alpha') ||
-            companyLower.includes('company beta') ||
-            companyLower.includes('factcorp') ||
-            companyLower.includes('example corp');
-
-          const isMismatch = j.verificationStatus === 'SOURCE_MISMATCH' || j.jobStatus === 'SOURCE_MISMATCH';
-          const isExpired = j.verificationStatus === 'EXPIRED' || j.jobStatus === 'EXPIRED';
-
-          const modePass =
-            modeFilter === 'LIVE'
-              ? (j.jobStatus === 'ACTIVE' || j.verificationStatus === 'ACTIVE' || j.sourceVerified === true) && !isSynthetic && !isMismatch && !isExpired
-              : modeFilter === 'DEMO'
-              ? isSynthetic
-              : !isSynthetic;
-
-          if (!modePass) return false;
-
-          if (searchLower.length > 0) {
-            return (
-              companyLower.includes(searchLower) ||
-              titleLower.includes(searchLower) ||
-              platformLower.includes(searchLower) ||
-              descLower.includes(searchLower) ||
-              idLower.includes(searchLower)
-            );
-          }
-
-          return true;
-        });
-
-        if (filteredJobs.length === 0) {
+        if (jobs.length === 0) {
           return (
             <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
               <Briefcase className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
@@ -437,7 +375,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 Sentinel strictly enforces zero fake or unverified jobs. Try adjusting your target role query or country filters to trigger fresh live job discovery across active ATS boards.
               </p>
               <div className="pt-2 flex items-center justify-center space-x-4 text-[11px] text-slate-400">
-                <span>Providers Checked: 9</span>
+                <span>Providers Checked: 10</span>
                 <span>•</span>
                 <span>Verified Live Jobs: 0</span>
                 <span>•</span>
@@ -449,7 +387,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.map((job) => {
+            {jobs.map((job) => {
             const ranking = job.ranking || (job.evaluation as any)?.ranking;
             const priority = (job.applicationPriority || ranking?.applicationPriority || 'MEDIUM') as string;
             const recommendation = (job.recommendation || ranking?.recommendation || 'CONSIDER') as string;

@@ -32,21 +32,6 @@ export class WorkableProvider extends BaseJobProvider {
       let boardsTimedOut = 0;
       let boardsRateLimited = 0;
 
-      const isFetchMocked = !!(global.fetch as any)?._isMockFunction || !!(global.fetch as any)?.mock;
-
-      if (process.env.NODE_ENV === 'test' && !isFetchMocked) {
-        boardsAttempted = 1;
-        boardsSucceeded = 1;
-        liveJobs.push(
-          this.normalize({
-            shortcode: 'C89210',
-            title: 'Full Stack Engineer - Security Infrastructure',
-            location: { city: 'Vancouver', country: 'Canada', country_code: 'CA' },
-            description: 'Build enterprise security systems using React, TypeScript, Node.js.',
-            published: '2026-08-06',
-          }, '1password')
-        );
-      } else {
         boardsAttempted = WORKABLE_ACCOUNTS.length;
         await Promise.all(
           WORKABLE_ACCOUNTS.map(async (account) => {
@@ -92,7 +77,6 @@ export class WorkableProvider extends BaseJobProvider {
             }
           })
         );
-      }
 
       const rawJobsBeforeQueryFilter = liveJobs.length;
       let filtered = liveJobs;
@@ -107,27 +91,14 @@ export class WorkableProvider extends BaseJobProvider {
         filtered = filtered.filter((j) => j.visaSponsorship);
       }
       if (query.keywords && query.keywords.length > 0) {
-        const kw = query.keywords.map((k) => k.toLowerCase());
-        const isExplicitUserSearch = !!(query.userQuery && query.userQuery.trim().length > 0);
+        const kwList = query.keywords.map((k) => k.toLowerCase().trim());
+        const allTokens = Array.from(new Set(kwList.flatMap((k) => k.split(/\s+/)))).filter((t) => t.length > 2);
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
-          if (isExplicitUserSearch) {
-            return kw.some((k) => {
-              if (text.includes(k)) return true;
-              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
-              return tokens.length > 0 && tokens.every((t) => {
-                if (text.includes(t)) return true;
-                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
-                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
-                }
-                return false;
-              });
-            });
-          }
-          return (
-            kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
-          );
+          const titleLower = (job.title || '').toLowerCase();
+          if (kwList.some((k) => titleLower.includes(k) || text.includes(k))) return true;
+          if (allTokens.some((t) => titleLower.includes(t) || text.includes(t))) return true;
+          return ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart', 'ios', 'android'].some((t) => titleLower.includes(t));
         });
       }
 

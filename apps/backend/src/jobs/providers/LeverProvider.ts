@@ -34,22 +34,6 @@ export class LeverProvider extends BaseJobProvider {
       let boardsTimedOut = 0;
       let boardsRateLimited = 0;
 
-      const isFetchMocked = !!(global.fetch as any)?._isMockFunction || !!(global.fetch as any)?.mock;
-
-      if (process.env.NODE_ENV === 'test' && !isFetchMocked) {
-        boardsAttempted = 1;
-        boardsSucceeded = 1;
-        liveJobs.push(
-          this.normalize({
-            id: '930129-backend',
-            text: 'Senior Backend Engineer - Platform',
-            company: 'Atlassian',
-            categories: { location: 'Sydney, Australia' },
-            descriptionPlain: 'Build microservices using Node.js, TypeScript, Go. Visa sponsorship offered.',
-            createdAt: 1722900000000,
-          }, 'atlassian')
-        );
-      } else {
         boardsAttempted = LEVER_COMPANIES.length;
         await Promise.all(
           LEVER_COMPANIES.map(async (companyToken) => {
@@ -93,7 +77,6 @@ export class LeverProvider extends BaseJobProvider {
             }
           })
         );
-      }
 
       const rawJobsBeforeQueryFilter = liveJobs.length;
       let filtered = liveJobs;
@@ -108,27 +91,14 @@ export class LeverProvider extends BaseJobProvider {
         filtered = filtered.filter((j) => j.visaSponsorship);
       }
       if (query.keywords && query.keywords.length > 0) {
-        const kw = query.keywords.map((k) => k.toLowerCase());
-        const isExplicitUserSearch = !!(query.userQuery && query.userQuery.trim().length > 0);
+        const kwList = query.keywords.map((k) => k.toLowerCase().trim());
+        const allTokens = Array.from(new Set(kwList.flatMap((k) => k.split(/\s+/)))).filter((t) => t.length > 2);
         filtered = filtered.filter((job) => {
           const text = `${job.title} ${job.company} ${job.description}`.toLowerCase();
-          if (isExplicitUserSearch) {
-            return kw.some((k) => {
-              if (text.includes(k)) return true;
-              const tokens = k.split(/\s+/).filter((t) => t.length > 2);
-              return tokens.length > 0 && tokens.every((t) => {
-                if (text.includes(t)) return true;
-                if (t === 'developer' || t === 'engineer' || t === 'programmer') {
-                  return text.includes('engineer') || text.includes('developer') || text.includes('programmer');
-                }
-                return false;
-              });
-            });
-          }
-          return (
-            kw.some((k) => text.includes(k)) ||
-            ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart'].some((t) => text.includes(t))
-          );
+          const titleLower = (job.title || '').toLowerCase();
+          if (kwList.some((k) => titleLower.includes(k) || text.includes(k))) return true;
+          if (allTokens.some((t) => titleLower.includes(t) || text.includes(t))) return true;
+          return ['software', 'engineer', 'developer', 'architect', 'programmer', 'mobile', 'flutter', 'dart', 'ios', 'android'].some((t) => titleLower.includes(t));
         });
       }
 

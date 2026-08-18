@@ -11,6 +11,7 @@ import { CountryCode } from '@sentinel/types';
 export class JobService {
   private scraper: JobScraperEngine;
   private jobRepo: JobRepository;
+  private activeDiscoveryFlights = new Map<string, Promise<any>>();
 
   constructor() {
     this.jobRepo = new JobRepository();
@@ -47,6 +48,9 @@ export class JobService {
 
   async triggerScrape(dto: ScrapeJobsDto): Promise<{
     success: boolean;
+    discoveryRunId: string;
+    discoveredAt: string;
+    source: 'LIVE_DISCOVERY';
     mode: 'WORLDWIDE' | 'CUSTOM';
     query: string;
     countries: string[];
@@ -68,62 +72,98 @@ export class JobService {
       countries = ['ALL' as CountryCode];
     }
 
-    try {
-      const report = await this.scraper.executeParallelCrawl({
-        q: userQueryStr || undefined,
-        userQuery: userQueryStr || undefined,
-        countries,
-        visaOnly: dto.visaOnly,
-        remoteOnly: dto.remoteOnly,
-        minSalary: dto.minSalary,
-        keywords: dto.keywords,
-      });
+    const flightKey = `${userQueryStr.toLowerCase()}_${countries.map(c => String(c)).sort().join(',')}_${dto.visaOnly === true}_${dto.remoteOnly === true}`;
 
-      const countriesRes = countries.map((c) => String(c));
-
-      console.log('[SCRAPE_TRACE] [7] SCRAPER SERVICE', {
-        stage: 'SCRAPER_SERVICE',
-        jobsCount: report.jobs?.length,
-        totalMatches: report.jobs?.length,
-        totalScrapedRaw: report.totalScrapedRaw,
-        providerBreakdown: report.providerBreakdown,
-        jobIds: report.jobs?.map((j: any) => j.id),
-      });
-
-      return {
-        success: true,
-        mode: report.mode,
-        query: userQueryStr,
-        countries: countriesRes,
-        scrapedCount: report.totalUniqueNew,
-        totalMatches: report.jobs.length,
-        country: countriesRes.join(', '),
-        report,
-        jobs: report.jobs,
-      };
-    } catch (err: any) {
-      const countriesRes = countries.map((c) => String(c));
-      return {
-        success: true,
-        mode: 'WORLDWIDE',
-        query: userQueryStr,
-        countries: countriesRes,
-        scrapedCount: 0,
-        totalMatches: 0,
-        country: countriesRes.join(', '),
-        report: {
-          mode: 'WORLDWIDE',
-          totalScrapedRaw: 0,
-          totalUniqueNew: 0,
-          duplicatesFiltered: 0,
-          providersProcessed: 9,
-          providerBreakdown: {},
-          jobs: [],
-          error: err.message,
-        },
-        jobs: [],
-      };
+    if (this.activeDiscoveryFlights.has(flightKey)) {
+      console.log(`[SINGLE_FLIGHT] Coalescing concurrent discovery request for key "${flightKey}"`);
+      return await this.activeDiscoveryFlights.get(flightKey);
     }
+
+    const discoveryRunId = `disc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const discoveredAt = new Date().toISOString();
+
+    const discoveryPromise = (async () => {
+      try {
+        const countriesRes = countries.map((c) => String(c));
+        console.log(`[DISCOVERY] runId=${discoveryRunId} query="${userQueryStr}" countries="${countriesRes.join(',')}"`);
+
+        const report = await this.scraper.executeParallelCrawl({
+          q: userQueryStr || undefined,
+          userQuery: userQueryStr || undefined,
+          countries,
+          visaOnly: dto.visaOnly,
+          remoteOnly: dto.remoteOnly,
+          minSalary: dto.minSalary,
+          keywords: dto.keywords,
+        });
+
+        if (report.providerBreakdown) {
+          Object.entries(report.providerBreakdown).forEach(([providerName, details]: any) => {
+            console.log(`[DISCOVERY] provider=${providerName} raw=${details.scraped || 0} status=${details.status || 'UNKNOWN'}`);
+          });
+        }
+        console.log(`[DISCOVERY] raw=${report.totalScrapedRaw} verified=${report.jobs.length} final=${report.jobs.length}`);
+
+        console.log('[SCRAPE_TRACE] [7] SCRAPER SERVICE', {
+          stage: 'SCRAPER_SERVICE',
+          discoveryRunId,
+          discoveredAt,
+          jobsCount: report.jobs?.length,
+          totalMatches: report.jobs?.length,
+          totalScrapedRaw: report.totalScrapedRaw,
+          providerBreakdown: report.providerBreakdown,
+          jobIds: report.jobs?.map((j: any) => j.id),
+        });
+
+        return {
+          success: true,
+          discoveryRunId,
+          discoveredAt,
+          source: 'LIVE_DISCOVERY' as const,
+          mode: report.mode,
+          query: userQueryStr,
+          countries: countriesRes,
+          scrapedCount: report.totalUniqueNew,
+          totalMatches: report.jobs.length,
+          country: countriesRes.join(', '),
+          report,
+          debug: report.debug,
+          rejectionSamples: report.rejectionSamples || [],
+          jobs: report.jobs,
+        };
+      } catch (err: any) {
+        const countriesRes = countries.map((c) => String(c));
+        console.log(`[DISCOVERY] raw=0 verified=0 final=0 error="${err.message}"`);
+        return {
+          success: true,
+          discoveryRunId,
+          discoveredAt,
+          source: 'LIVE_DISCOVERY' as const,
+          mode: 'WORLDWIDE' as const,
+          query: userQueryStr,
+          countries: countriesRes,
+          scrapedCount: 0,
+          totalMatches: 0,
+          country: countriesRes.join(', '),
+          report: {
+            mode: 'WORLDWIDE',
+            totalScrapedRaw: 0,
+            totalUniqueNew: 0,
+            duplicatesFiltered: 0,
+            providersProcessed: 10,
+            providerBreakdown: {},
+            rejectionStats: {},
+            jobs: [],
+          },
+          jobs: [],
+        };
+      } finally {
+        this.activeDiscoveryFlights.delete(flightKey);
+      }
+    })();
+
+    this.activeDiscoveryFlights.set(flightKey, discoveryPromise);
+    return await discoveryPromise;
   }
 
   async evaluateJobById(jobId?: string): Promise<{ success: boolean; evaluation: any; ranking: any }> {
