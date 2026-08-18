@@ -282,13 +282,13 @@ export class JobVerificationService {
     verifiedTitle?: string,
     verifiedDescription?: string
   ): SearchQueryRelevanceResult {
-    const rawQuery = (searchQuery || job.title || '').trim().toLowerCase();
+    const rawQuery = (searchQuery || '').trim().toLowerCase();
     if (!rawQuery || rawQuery === 'all' || rawQuery === 'worldwide' || rawQuery.length < 2) {
       return {
         searchRelevanceVerified: true,
         searchRelevanceScore: 1.0,
         searchRelevanceReason: 'Broad search query allows all verified roles.',
-        searchQuery: rawQuery,
+        searchQuery: rawQuery || 'WORLDWIDE',
       };
     }
 

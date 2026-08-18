@@ -37,6 +37,7 @@ import { db } from '../database';
 import { logger } from '@sentinel/shared';
 import { jobVerificationService } from '../services/JobVerificationService';
 import { jobDeduplicationService } from '../services/JobDeduplicationService';
+import { classifyFreshnessCategory } from './utils/dateNormalizer';
 
 export interface SearchEngineCrawlReport {
   mode: 'WORLDWIDE' | 'CUSTOM';
@@ -170,19 +171,19 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
-    const defaultMobileQueries = [
-      'Flutter Developer',
-      'Flutter Engineer',
-      'Mobile Developer',
-      'Mobile Engineer',
-      'Software Engineer - Mobile',
-      'Android Developer',
-      'iOS Developer',
-    ];
+    const targetProfile = deriveCandidateTargetProfile(masterResume);
+    const dynamicSubQueries = ['Flutter Developer', 'Flutter Engineer', 'Mobile Developer', 'Mobile Engineer', 'Software Engineer - Mobile'];
+
+    if (targetProfile.coreTechnologies.includes('kotlin') || targetProfile.coreTechnologies.includes('android sdk') || targetProfile.roleFamilies.includes('native_android')) {
+      dynamicSubQueries.push('Android Developer');
+    }
+    if (targetProfile.coreTechnologies.includes('swift') || targetProfile.coreTechnologies.includes('ios sdk') || targetProfile.roleFamilies.includes('native_ios')) {
+      dynamicSubQueries.push('iOS Developer');
+    }
 
     const activeSubQueries = derived.userQuery
-      ? Array.from(new Set([derived.userQuery, ...defaultMobileQueries]))
-      : Array.from(new Set([...(derived.primaryQueries || []), ...defaultMobileQueries]));
+      ? Array.from(new Set([derived.userQuery, ...dynamicSubQueries]))
+      : Array.from(new Set([...(derived.primaryQueries || []), ...dynamicSubQueries]));
 
     // 4. Execute provider searches concurrently with per-provider error isolation and 12s timeout safety
     const searchPromises = this.providers.map(async (provider) => {
@@ -311,6 +312,7 @@ export class JobScraperEngine {
       SEARCH_QUERY_MISMATCH: 0,
       COUNTRY_MISMATCH: 0,
       EXPIRED: 0,
+      STALE: 0,
       INVALID_URL: 0,
       TITLE_MISMATCH: 0,
       COMPANY_MISMATCH: 0,
@@ -451,7 +453,18 @@ export class JobScraperEngine {
             rejectionStats.OTHER++;
             logRejection(job, 'VERIFICATION_ERROR', error.message);
           } else if (verifiedJob) {
-            if (
+            const freshnessCat = classifyFreshnessCategory(verifiedJob.postedDate || verifiedJob.postedAt);
+            if (freshnessCat === 'STALE') {
+              rejectionStats.STALE = (rejectionStats.STALE || 0) + 1;
+              logRejection(
+                job,
+                'STALE',
+                `External job posting date (${verifiedJob.postedDate || verifiedJob.postedAt}) is >30 days old (STALE).`,
+                [],
+                [],
+                (verifiedJob as any).titleMatchScore
+              );
+            } else if (
               verifiedJob.sourceVerified === true &&
               verifiedJob.verificationStatus === 'ACTIVE' &&
               verifiedJob.jobIdentityVerified !== false

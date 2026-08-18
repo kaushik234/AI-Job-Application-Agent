@@ -194,36 +194,34 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(response.report.pipeline?.returned).toBe(response.jobs.length);
   });
 
-  test('8. Flutter job with JSON-LD description containing Flutter passes', () => {
+  test('8. WORLDWIDE mode does not pass job title as searchQuery into verifySearchQueryRelevance', () => {
     const job: any = {
-      id: 'job-flutter-jsonld-1',
-      title: 'Software Engineer',
+      id: 'job-fleet-infra-1',
+      title: 'Software Engineer, Fleet Infrastructure',
       company: 'Canva',
       location: 'Sydney, AU',
       country: 'AU',
-      description: 'Building mobile applications',
     };
 
-    const verifiedDescription = 'We are hiring a Software Engineer to develop cross-platform mobile apps in Flutter and Dart.';
-    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, verifiedDescription);
+    // When searchQuery is undefined (WORLDWIDE mode)
+    const result = jobVerificationService.verifySearchQueryRelevance(job, undefined, job.title, 'Backend Go infrastructure');
 
     expect(result.searchRelevanceVerified).toBe(true);
+    expect(result.searchQuery).toBe('WORLDWIDE');
+    expect(result.searchQuery).not.toBe('software engineer, fleet infrastructure');
   });
 
-  test('9. Generic Software Engineer whose footer/navigation merely contains Flutter fails', () => {
+  test('9. CUSTOM query "flutter" rejects non-Flutter job "Software Engineer, Fleet Infrastructure"', () => {
     const job: any = {
-      id: 'job-generic-infra-1',
-      title: 'Software Engineer, Data Infrastructure',
-      company: 'TechCorp',
-      location: 'San Francisco, US',
-      country: 'US',
-      description: 'Managing PostgreSQL databases, Go services, and Kubernetes clusters.',
+      id: 'job-fleet-infra-2',
+      title: 'Software Engineer, Fleet Infrastructure',
+      company: 'Canva',
+      location: 'Sydney, AU',
+      country: 'AU',
     };
 
-    // Job-specific description does NOT contain Flutter or Dart
-    const verifiedDescription = 'Responsible for backend infrastructure, PostgreSQL databases, Go microservices, and Kubernetes clusters.';
-
-    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, verifiedDescription);
+    // When searchQuery is explicitly "flutter"
+    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, 'Backend Go infrastructure microservices');
 
     expect(result.searchRelevanceVerified).toBe(false);
     expect(result.searchRelevanceReason).toContain('missing requested technology requirement');
