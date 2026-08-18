@@ -144,8 +144,13 @@ const MainAppContent: React.FC = () => {
         ? res.data.report.jobs
         : [];
 
-      console.log(`[TARGET_JOBS] Received ${freshJobs.length} verified jobs`);
-      console.log(`[TARGET_JOBS] Rendering ${freshJobs.length} fresh jobs`);
+      console.log('[TARGET_JOBS] Received', freshJobs.length, 'verified jobs');
+      console.log('[DISCOVERY_RESULT]', {
+        responseJobs: freshJobs.length,
+      });
+      console.log('[JOBS_VIEW]', {
+        jobsReceived: freshJobs.length,
+      });
 
       setJobs(freshJobs);
     } catch (err) {

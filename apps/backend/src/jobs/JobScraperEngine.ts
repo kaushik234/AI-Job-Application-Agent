@@ -69,6 +69,16 @@ export interface SearchEngineCrawlReport {
     rejectionReason: string;
   }>;
   discoveryRunId?: string;
+  pipeline?: {
+    rawJobsCollected: number;
+    afterDeduplication: number;
+    afterQueryFilter: number;
+    afterRoleRelevance: number;
+    afterLocationFilter: number;
+    afterVerification: number;
+    afterRanking: number;
+    returned: number;
+  };
   debug: {
     queriesGenerated: string[];
     rawJobsCollected: number;
@@ -347,7 +357,7 @@ export class JobScraperEngine {
         rejectionReason: reason,
       };
       rejectionDiagnostics.push(diag);
-      if (rejectionSamples.length < 20) {
+      if (rejectionSamples.length < 10) {
         rejectionSamples.push({
           jobId: job.id,
           title: job.title,
@@ -454,6 +464,18 @@ export class JobScraperEngine {
 
     // 9. STEP 5: Candidate Matching & Ranking (Phase 4 & Task 3)
     const scoredRawJobs = jobRankingService.rankJobs(verifiedActiveJobs, masterResume);
+    const top50Jobs = scoredRawJobs.slice(0, 50);
+
+    const pipeline = {
+      rawJobsCollected: rawJobs.length,
+      afterDeduplication: deduplicated.length,
+      afterQueryFilter: deduplicated.length,
+      afterRoleRelevance: roleRelevantJobs.length,
+      afterLocationFilter: countryFilteredJobs.length,
+      afterVerification: verifiedActiveJobs.length,
+      afterRanking: scoredRawJobs.length,
+      returned: top50Jobs.length,
+    };
 
     const debug = {
       queriesGenerated: activeSubQueries,
@@ -463,6 +485,7 @@ export class JobScraperEngine {
       afterLocationFilter: countryFilteredJobs.length,
       afterVerification: verifiedActiveJobs.length,
       finalJobs: scoredRawJobs.length,
+      pipeline,
     };
 
     console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
@@ -472,9 +495,6 @@ export class JobScraperEngine {
     if (scoredRawJobs.length > 0) {
       discoveryJobStore.saveJobs(scoredRawJobs, runId);
     }
-
-    // 8. Top 50 jobs ordered by priority and matchScore
-    const top50Jobs = scoredRawJobs.slice(0, 50);
 
     logger.info('SEARCH', `[JOB_DEDUP] After deduplication: ${deduplicated.length}`);
     logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${deduplicated.length}`);
@@ -501,9 +521,9 @@ export class JobScraperEngine {
       providersProcessed: this.providers.length,
       providerBreakdown,
       rejectionStats,
-      rejectionDiagnostics,
+      pipeline,
       debug,
-      rejectionSamples,
+      rejectionSamples: rejectionSamples.slice(0, 10),
       jobs: top50Jobs,
     };
   }

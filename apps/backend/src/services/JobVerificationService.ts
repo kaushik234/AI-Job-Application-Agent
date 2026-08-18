@@ -740,8 +740,32 @@ export class JobVerificationService {
     const countryRes = this.deriveCanonicalCountry(locForCountry, job.country);
     const countryMismatch = countryRes.isVerified && countryRes.country !== job.country;
 
-    // Evaluate Search Query Relevance (Phase 1)
-    const searchRelevance = this.verifySearchQueryRelevance(job, searchQuery, detectedTitle, detectedDescription || html);
+    // Extract job-specific description with strict evidence priority (TASK 3)
+    let verifiedDescription: string | undefined = undefined;
+
+    // Priority 1: JSON-LD JobPosting description
+    if (detectedDescription && detectedDescription.trim().length > 20) {
+      verifiedDescription = detectedDescription.replace(/<[^>]+>/g, ' ').trim();
+    } else {
+      // Priority 2: Actual job-specific description extracted from DOM container
+      const domDescMatch = html.match(
+        /<(?:div|section|article)[^>]*(?:id|class|data-qa)=["'][^"']*(?:job-description|posting-description|description|section-description|job-details|content)[^"']*["'][^>]*>(.*?)<\/(?:div|section|article)>/is
+      );
+      if (domDescMatch && domDescMatch[1]) {
+        const cleanedDom = domDescMatch[1].replace(/<[^>]+>/g, ' ').trim();
+        if (cleanedDom.length > 50) {
+          verifiedDescription = cleanedDom;
+        }
+      }
+    }
+
+    // Priority 3: Existing provider job.description if present and job-specific
+    if (!verifiedDescription && job.description && job.description.trim().length > 20) {
+      verifiedDescription = job.description.replace(/<[^>]+>/g, ' ').trim();
+    }
+
+    // Evaluate Search Query Relevance with job-specific evidence only (never raw full page HTML)
+    const searchRelevance = this.verifySearchQueryRelevance(job, searchQuery, detectedTitle, verifiedDescription);
 
     if (!searchRelevance.searchRelevanceVerified) {
       return {
@@ -1028,7 +1052,7 @@ export class JobVerificationService {
     let demoCount = 0;
 
     for (const job of jobs) {
-      const res = await this.verifyExternalJob(job);
+      const res = await this.verifyExternalJob(job, undefined, { persist: true });
       results.push(res);
 
       if (res.status === JobLifecycleStatus.ACTIVE && res.verified) activeCount++;

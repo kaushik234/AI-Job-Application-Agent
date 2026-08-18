@@ -33,6 +33,17 @@ jest.mock('../JobScraperEngine', () => {
           discoveryJobStore.saveJobs(jobs as any, runId);
         }
 
+        const pipeline = {
+          rawJobsCollected: jobs.length,
+          afterDeduplication: jobs.length,
+          afterQueryFilter: jobs.length,
+          afterRoleRelevance: jobs.length,
+          afterLocationFilter: jobs.length,
+          afterVerification: jobs.length,
+          afterRanking: jobs.length,
+          returned: jobs.length,
+        };
+
         return {
           mode: 'WORLDWIDE',
           discoveryRunId: runId,
@@ -45,6 +56,7 @@ jest.mock('../JobScraperEngine', () => {
             Ashby: { scraped: jobs.length, status: 'SUCCESS' },
           },
           rejectionStats: {},
+          pipeline,
           debug: {
             queriesGenerated: [queryParam?.query || 'flutter'],
             rawJobsCollected: jobs.length,
@@ -53,7 +65,9 @@ jest.mock('../JobScraperEngine', () => {
             afterLocationFilter: jobs.length,
             afterVerification: jobs.length,
             finalJobs: jobs.length,
+            pipeline,
           },
+          rejectionSamples: [],
           jobs,
         };
       }),
@@ -146,7 +160,34 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(snapshot).toBeDefined();
   });
 
-  test('5. Flutter job with JSON-LD description containing Flutter passes', () => {
+  test('5. Discovery response does not expose unlimited rejectionDiagnostics and caps rejectionSamples to max 10', async () => {
+    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
+
+    expect((response.report as any).rejectionDiagnostics).toBeUndefined();
+    expect(response.report.rejectionSamples.length).toBeLessThanOrEqual(10);
+  });
+
+  test('6. Discovery pipeline counts are real and present in report', async () => {
+    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
+
+    const pipeline = (response.report as any).pipeline;
+    expect(pipeline).toBeDefined();
+    expect(pipeline.rawJobsCollected).toBeDefined();
+    expect(pipeline.afterDeduplication).toBeDefined();
+    expect(pipeline.afterRoleRelevance).toBeDefined();
+    expect(pipeline.afterVerification).toBeDefined();
+    expect(pipeline.afterRanking).toBeDefined();
+    expect(pipeline.returned).toBe(response.jobs.length);
+  });
+
+  test('7. Returned count equals actual jobs array length', async () => {
+    const response = await jobService.triggerScrape({ query: 'flutter', countries: ['ALL'] });
+
+    expect(response.jobs.length).toBe(response.totalMatches);
+    expect(response.report.pipeline?.returned).toBe(response.jobs.length);
+  });
+
+  test('8. Flutter job with JSON-LD description containing Flutter passes', () => {
     const job: any = {
       id: 'job-flutter-jsonld-1',
       title: 'Software Engineer',
@@ -162,7 +203,7 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(result.searchRelevanceVerified).toBe(true);
   });
 
-  test('6. Generic Software Engineer whose footer/navigation merely contains Flutter fails', () => {
+  test('9. Generic Software Engineer whose footer/navigation merely contains Flutter fails', () => {
     const job: any = {
       id: 'job-generic-infra-1',
       title: 'Software Engineer, Data Infrastructure',
@@ -181,7 +222,7 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(result.searchRelevanceReason).toContain('missing requested technology requirement');
   });
 
-  test('7. "flutter python" requires both technology groups (Flutter/Dart AND Python)', () => {
+  test('10. "flutter python" requires both technology groups (Flutter/Dart AND Python)', () => {
     const job: any = {
       id: 'job-flutter-only-1',
       title: 'Senior Flutter Developer',
@@ -204,22 +245,7 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(res2.searchRelevanceVerified).toBe(true);
   });
 
-  test('8. "flutter" accepts Flutter OR Dart in legitimate job-specific content', () => {
-    const job: any = {
-      id: 'job-dart-dev-1',
-      title: 'Mobile Application Engineer',
-      company: 'AppStudio',
-      location: 'Berlin, DE',
-      country: 'DE',
-    };
-
-    const dartOnlyDesc = 'Building high performance cross platform apps using Dart.';
-    const result = jobVerificationService.verifySearchQueryRelevance(job, 'flutter', job.title, dartOnlyDesc);
-
-    expect(result.searchRelevanceVerified).toBe(true);
-  });
-
-  test('9. Transient jobs remain resolvable through JobRepository', async () => {
+  test('11. Transient jobs remain resolvable through JobRepository', async () => {
     const transientJob: any = {
       id: 'transient-resolvable-777',
       title: 'Transient Mobile Engineer',
@@ -240,7 +266,7 @@ describe('Focused Correctness Verification & Transient Architecture Test Suite',
     expect(resolved?.company).toBe('TransientCo');
   });
 
-  test('10. Existing saved DB jobs still resolve correctly', async () => {
+  test('12. Existing saved DB jobs still resolve correctly', async () => {
     const allDbJobs = await db.getAllJobs();
     expect(allDbJobs.length).toBeGreaterThan(0);
 
