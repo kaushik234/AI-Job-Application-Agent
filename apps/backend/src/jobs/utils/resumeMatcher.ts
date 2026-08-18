@@ -9,6 +9,8 @@ import { calculateResumeExperienceYears } from './queryGenerator';
 export interface CandidateTargetProfile {
   primaryRoles: string[];
   coreTechnologies: string[];
+  primaryTechnologies: string[];
+  supportingTechnologies: string[];
   secondaryTechnologies: string[];
   roleFamilies: string[];
   prohibitedRoleTerms: string[];
@@ -25,6 +27,8 @@ export function deriveCandidateTargetProfile(resume?: MasterResume | null): Cand
     return {
       primaryRoles: [],
       coreTechnologies: [],
+      primaryTechnologies: [],
+      supportingTechnologies: [],
       secondaryTechnologies: [],
       roleFamilies: [],
       prohibitedRoleTerms: [],
@@ -62,27 +66,32 @@ export function deriveCandidateTargetProfile(resume?: MasterResume | null): Cand
   const coreTechnologies: string[] = [...allSkills];
   const roleFamilies: string[] = [];
 
-  const textScan = `${primaryRoles.join(' ')} ${skillsLower.join(' ')}`.toLowerCase();
+  const rolesText = primaryRoles.join(' ').toLowerCase();
+  const frameworksText = rawFrameworks.join(' ').toLowerCase();
+  const languagesText = rawLanguages.join(' ').toLowerCase();
+  const expHighlights = (resume.experience || []).flatMap((e) => e.highlights || []).join(' ').toLowerCase();
 
-  if (textScan.includes('flutter') || textScan.includes('dart')) {
+  const primaryTechScan = `${rolesText} ${frameworksText} ${languagesText} ${expHighlights}`;
+
+  if (/\b(?:flutter|dart)\b/.test(primaryTechScan)) {
     roleFamilies.push('flutter', 'cross_platform_mobile', 'mobile');
   }
-  if (textScan.includes('kotlin') || textScan.includes('android')) {
+  if (/\b(?:kotlin)\b/.test(primaryTechScan) || (/\b(?:android)\b/.test(rolesText) && !/\bflutter\b/.test(rolesText))) {
     roleFamilies.push('native_android', 'mobile');
   }
-  if (textScan.includes('swift') || textScan.includes('ios') || textScan.includes('uikit')) {
+  if (/\b(?:swift|uikit)\b/.test(primaryTechScan) || (/\b(?:ios)\b/.test(rolesText) && !/\bflutter\b/.test(rolesText))) {
     roleFamilies.push('native_ios', 'mobile');
   }
-  if (textScan.includes('react') || textScan.includes('vue') || textScan.includes('angular') || textScan.includes('frontend')) {
+  if (/\b(?:vue|angular|frontend)\b/.test(rolesText) || (/\b(?:react)\b/.test(rolesText) && !/\b(?:react\s+native)\b/.test(rolesText))) {
     roleFamilies.push('web_frontend', 'frontend');
   }
-  if (textScan.includes('node') || textScan.includes('python') || textScan.includes('django') || textScan.includes('java') || textScan.includes('golang') || textScan.includes('express') || textScan.includes('backend')) {
+  if (/\b(?:node|nodejs|python|django|fastapi|golang|express|backend)\b/.test(rolesText) || (/\bjava\b/.test(rolesText) && !/\bjavascript\b/.test(rolesText))) {
     roleFamilies.push('backend_systems', 'backend');
   }
-  if (textScan.includes('spark') || textScan.includes('snowflake') || textScan.includes('data engineer') || textScan.includes('etl') || textScan.includes('hadoop')) {
+  if (/\b(?:spark|snowflake|data\s+engineer|etl|hadoop)\b/.test(rolesText) || /\b(?:data\s+engineer)\b/.test(primaryTechScan)) {
     roleFamilies.push('data_engineering', 'data');
   }
-  if (textScan.includes('aws') || textScan.includes('devops') || textScan.includes('kubernetes') || textScan.includes('terraform') || textScan.includes('docker')) {
+  if (/\b(?:devops|kubernetes|terraform)\b/.test(rolesText) || /\b(?:devops\s+engineer)\b/.test(primaryTechScan)) {
     roleFamilies.push('devops', 'cloud');
   }
 
@@ -92,15 +101,35 @@ export function deriveCandidateTargetProfile(resume?: MasterResume | null): Cand
   const hasIosNative = roleFamilies.includes('native_ios');
 
   if (hasFlutter && !hasAndroidNative) {
-    prohibitedRoleTerms.push('android engineer', 'android developer', 'android sdk');
+    prohibitedRoleTerms.push('android systems engineer', 'android os', 'android kernel', 'android engineer', 'android developer', 'android sdk');
   }
   if (hasFlutter && !hasIosNative) {
     prohibitedRoleTerms.push('ios engineer', 'ios developer', 'swift engineer');
   }
 
+  const PRIMARY_TECH_SET = new Set([
+    'flutter', 'react native', 'react', 'next.js', 'vue', 'angular', 'node', 'node.js', 'nodejs', 'python', 'django',
+    'fastapi', 'java', 'spring', 'golang', 'go', 'ruby', 'rails', 'c#', '.net', 'cpp', 'c++',
+    'spark', 'snowflake', 'kotlin', 'swift'
+  ]);
+
+  const primaryTechs = Array.from(new Set(coreTechnologies.filter((t) => PRIMARY_TECH_SET.has(t.toLowerCase()))));
+  const supportingTechs = Array.from(new Set(coreTechnologies.filter((t) => !PRIMARY_TECH_SET.has(t.toLowerCase()))));
+
+  const primaryRolesSet = new Set<string>();
+  for (const r of primaryRoles) {
+    primaryRolesSet.add(r);
+    const base = r.replace(/^(senior|lead|junior|principal|staff|associate)\s+/i, '').trim();
+    if (base && base.length > 0) {
+      primaryRolesSet.add(base);
+    }
+  }
+
   return {
-    primaryRoles: Array.from(new Set(primaryRoles)),
+    primaryRoles: Array.from(primaryRolesSet),
     coreTechnologies: Array.from(new Set(coreTechnologies)),
+    primaryTechnologies: primaryTechs,
+    supportingTechnologies: supportingTechs,
     secondaryTechnologies: [],
     roleFamilies: Array.from(new Set(roleFamilies)),
     prohibitedRoleTerms,
@@ -267,18 +296,7 @@ export function checkRoleRelevanceDetails(
 
   const targetProfile = deriveCandidateTargetProfile(resume);
 
-  // 2. Prohibited Role Terms Check
-  const matchedProhibited = targetProfile.prohibitedRoleTerms.filter((term) => title.includes(term.toLowerCase()));
-  if (matchedProhibited.length > 0) {
-    return {
-      isRelevant: false,
-      matchedKeywords: [],
-      missingKeywords: matchedProhibited,
-      reason: `Role title contains prohibited term "${matchedProhibited.join(', ')}" incompatible with candidate profile.`,
-    };
-  }
-
-  // 3. User Query Explicit Override (CUSTOM Mode)
+  // 2. User Query Explicit Override (CUSTOM Mode)
   const userQueryClean = (userQuery || '').toLowerCase().trim();
   if (userQueryClean.length > 0) {
     const qTokens = userQueryClean.split(/\s+/).filter((t) => t.length > 2);
@@ -293,25 +311,121 @@ export function checkRoleRelevanceDetails(
     }
   }
 
+  // 3. Prohibited Role Terms & Native Title Check
+  const titleLower = title.toLowerCase();
+  const matchedProhibited = targetProfile.prohibitedRoleTerms.filter((term) => titleLower.includes(term.toLowerCase()));
+  if (matchedProhibited.length > 0) {
+    return {
+      isRelevant: false,
+      matchedKeywords: [],
+      missingKeywords: matchedProhibited,
+      reason: `Role title contains prohibited term "${matchedProhibited.join(', ')}" incompatible with candidate profile.`,
+    };
+  }
+
+  const isMobileCandidate = targetProfile.roleFamilies.some((f) =>
+    ['flutter', 'cross_platform_mobile', 'mobile'].includes(f)
+  );
+  const isBackendCandidate = targetProfile.roleFamilies.some((f) =>
+    ['backend_systems', 'backend'].includes(f)
+  );
+  const isFrontendCandidate = targetProfile.roleFamilies.some((f) =>
+    ['web_frontend', 'frontend'].includes(f)
+  );
+  const isDataCandidate = targetProfile.roleFamilies.some((f) =>
+    ['data_engineering', 'data'].includes(f)
+  );
+  const isDevOpsCandidate = targetProfile.roleFamilies.some((f) =>
+    ['devops', 'cloud'].includes(f)
+  );
+
+  const hasAndroidNative = targetProfile.roleFamilies.includes('native_android');
+  const hasIosNative = targetProfile.roleFamilies.includes('native_ios');
+
+  if (isMobileCandidate && !hasAndroidNative) {
+    if (titleLower.includes('android') && !titleLower.includes('flutter') && !description.includes('flutter')) {
+      return {
+        isRelevant: false,
+        matchedKeywords: [],
+        missingKeywords: ['flutter'],
+        reason: `Native Android role title "${job.title}" is incompatible with candidate Flutter profile.`,
+      };
+    }
+  }
+
+  if (isMobileCandidate && !hasIosNative) {
+    if (
+      (titleLower.includes('ios engineer') || titleLower.includes('ios developer') || titleLower.includes('swift engineer') || titleLower.includes('swift developer')) &&
+      !titleLower.includes('flutter') &&
+      !description.includes('flutter')
+    ) {
+      return {
+        isRelevant: false,
+        matchedKeywords: [],
+        missingKeywords: ['flutter'],
+        reason: `Native iOS role title "${job.title}" is incompatible with candidate Flutter profile.`,
+      };
+    }
+  }
+
   // 4. Role Family & Tech Matching
-  const matchedTechs = targetProfile.coreTechnologies.filter((tech) => fullContent.includes(tech.toLowerCase()) || title.includes(tech.toLowerCase()));
-  const matchedRoles = targetProfile.primaryRoles.filter((role) => title.includes(role.toLowerCase()) || fullContent.includes(role.toLowerCase()));
+  const matchedTechs = targetProfile.coreTechnologies.filter(
+    (tech) => fullContent.includes(tech.toLowerCase()) || title.includes(tech.toLowerCase())
+  );
+  const matchedPrimaryTechs = targetProfile.primaryTechnologies.filter(
+    (tech) => fullContent.includes(tech.toLowerCase()) || title.includes(tech.toLowerCase())
+  );
 
-  const isMobileCandidate = targetProfile.roleFamilies.some((f) => ['flutter', 'cross_platform_mobile', 'mobile', 'native_android', 'native_ios'].includes(f));
-  const isBackendCandidate = targetProfile.roleFamilies.some((f) => ['backend_systems', 'backend'].includes(f));
-  const isFrontendCandidate = targetProfile.roleFamilies.some((f) => ['web_frontend', 'frontend'].includes(f));
-  const isDataCandidate = targetProfile.roleFamilies.some((f) => ['data_engineering', 'data'].includes(f));
-  const isDevOpsCandidate = targetProfile.roleFamilies.some((f) => ['devops', 'cloud'].includes(f));
+  const isJobMobile =
+    title.includes('mobile') ||
+    title.includes('flutter') ||
+    title.includes('dart') ||
+    title.includes('ios') ||
+    title.includes('android') ||
+    title.includes('swift') ||
+    title.includes('kotlin') ||
+    description.includes('flutter') ||
+    description.includes('mobile architecture') ||
+    description.includes('ios/android');
 
-  const isJobMobile = title.includes('mobile') || title.includes('flutter') || title.includes('dart') || title.includes('ios') || title.includes('android') || title.includes('swift') || title.includes('kotlin');
-  const isJobBackend = title.includes('backend') || title.includes('node') || title.includes('python') || title.includes('django') || title.includes('java') || title.includes('express') || title.includes('api engineer');
-  const isJobFrontend = title.includes('frontend') || title.includes('react') || title.includes('vue') || title.includes('angular') || title.includes('ui engineer');
-  const isJobData = title.includes('data engineer') || title.includes('etl') || title.includes('pyspark') || title.includes('snowflake') || title.includes('data platform');
-  const isJobDevOps = title.includes('devops') || title.includes('infrastructure') || title.includes('cloud engineer') || title.includes('site reliability');
+  const isJobBackend =
+    title.includes('backend') ||
+    title.includes('node') ||
+    title.includes('python') ||
+    title.includes('django') ||
+    title.includes('java') ||
+    title.includes('express') ||
+    title.includes('api engineer') ||
+    (description.includes('golang') && description.includes('kubernetes')) ||
+    (description.includes('microservices') && description.includes('distributed systems'));
+
+  const isJobData =
+    title.includes('data engineer') ||
+    title.includes('etl') ||
+    title.includes('pyspark') ||
+    title.includes('snowflake') ||
+    title.includes('data platform');
+
+  const isJobDevOps =
+    title.includes('devops') ||
+    title.includes('infrastructure') ||
+    title.includes('cloud engineer') ||
+    title.includes('site reliability');
 
   // Domain Alignment Logic
   if (isMobileCandidate) {
-    if (isJobMobile) {
+    if ((isJobBackend && !isBackendCandidate) || (isJobData && !isDataCandidate) || (isJobDevOps && !isDevOpsCandidate)) {
+      if (!isJobMobile && !description.includes('flutter') && !description.includes('mobile')) {
+        return {
+          isRelevant: false,
+          matchedKeywords: [],
+          missingKeywords: targetProfile.primaryTechnologies,
+          reason: `Job content for "${job.title}" specifies an incompatible backend/data/cloud stack.`,
+        };
+      }
+    }
+
+    if (isJobMobile || matchedPrimaryTechs.length > 0) {
       return {
         isRelevant: true,
         matchedKeywords: matchedTechs.length > 0 ? matchedTechs : ['mobile_role'],
@@ -319,18 +433,10 @@ export function checkRoleRelevanceDetails(
         reason: `Mobile software engineering role "${job.title}" aligns with candidate target profile.`,
       };
     }
-    if ((isJobBackend && !isBackendCandidate) || (isJobData && !isDataCandidate) || (isJobDevOps && !isDevOpsCandidate)) {
-      return {
-        isRelevant: false,
-        matchedKeywords: [],
-        missingKeywords: targetProfile.coreTechnologies,
-        reason: `Job title "${job.title}" belongs to a different domain incompatible with candidate mobile profile.`,
-      };
-    }
   }
 
   if (isBackendCandidate) {
-    if (isJobBackend) {
+    if (isJobBackend || matchedPrimaryTechs.length > 0) {
       return {
         isRelevant: true,
         matchedKeywords: matchedTechs.length > 0 ? matchedTechs : ['backend_role'],
@@ -343,13 +449,13 @@ export function checkRoleRelevanceDetails(
         isRelevant: false,
         matchedKeywords: [],
         missingKeywords: targetProfile.coreTechnologies,
-        reason: `Job title "${job.title}" belongs to mobile/data domain incompatible with candidate backend profile.`,
+        reason: `Job content for "${job.title}" specifies a mobile/data domain incompatible with backend profile.`,
       };
     }
   }
 
   if (isDataCandidate) {
-    if (isJobData) {
+    if (isJobData || matchedPrimaryTechs.length > 0) {
       return {
         isRelevant: true,
         matchedKeywords: matchedTechs.length > 0 ? matchedTechs : ['data_role'],
@@ -362,7 +468,7 @@ export function checkRoleRelevanceDetails(
         isRelevant: false,
         matchedKeywords: [],
         missingKeywords: targetProfile.coreTechnologies,
-        reason: `Job title "${job.title}" is incompatible with candidate data engineering profile.`,
+        reason: `Job content for "${job.title}" is incompatible with candidate data engineering profile.`,
       };
     }
   }
@@ -377,6 +483,21 @@ export function checkRoleRelevanceDetails(
     title.includes('developer');
 
   if (isGenericEngineeringTitle) {
+    // If description has explicit conflicting domain tech with 0 candidate tech matches, reject
+    if (
+      matchedTechs.length === 0 &&
+      ((description.includes('kubernetes') && description.includes('golang')) ||
+        (description.includes('c++') && description.includes('embedded')) ||
+        (description.includes('spark') && description.includes('hadoop')))
+    ) {
+      return {
+        isRelevant: false,
+        matchedKeywords: [],
+        missingKeywords: targetProfile.coreTechnologies,
+        reason: `Generic engineering role "${job.title}" description requires incompatible domain tech with 0 candidate skill match.`,
+      };
+    }
+
     return {
       isRelevant: true,
       matchedKeywords: matchedTechs.length > 0 ? matchedTechs : ['software_engineering'],

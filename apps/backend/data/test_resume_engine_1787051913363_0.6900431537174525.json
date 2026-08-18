@@ -1,0 +1,998 @@
+{
+  "jobs": [],
+  "matches": [],
+  "masterResume": {
+    "fullName": "Kaushik Khandala",
+    "email": "kaushikkhandalakaushik234@gmail.com",
+    "phone": "+91 8849170743",
+    "location": "Ahmedabad, India",
+    "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+    "github": "https://github.com/kaushikkhandala",
+    "portfolio": "https://kaushikkhandala.dev",
+    "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+    "explicitExperienceYears": 3.8,
+    "experienceSource": "RESUME_EXPLICIT",
+    "skills": {
+      "languages": [
+        "Dart"
+      ],
+      "frameworks": [
+        "Flutter",
+        "BLoC"
+      ],
+      "cloudAndDevOps": [
+        "Firebase"
+      ],
+      "databases": [
+        "SQLite",
+        "Hive"
+      ],
+      "tools": [
+        "Git",
+        "Android Studio",
+        "VSCode"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Safal Infosoft",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "12/2023",
+        "endDate": "Present",
+        "highlights": [
+          "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+          "Engineered offline caching layer using SQLite and Hive local key-value databases."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite",
+          "Hive",
+          "Firebase"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "01/2023",
+        "endDate": "11/2023",
+        "highlights": [
+          "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+          "Integrated RESTful API endpoints and state management."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "REST APIs",
+          "Git"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Operations Manager",
+        "location": "Ahmedabad, India",
+        "startDate": "07/2022",
+        "endDate": "01/2023",
+        "highlights": [
+          "Managed tech team operations and contributed to Flutter application development."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "Operations"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "institution": "Sal Engineering & Technical Institute",
+        "degree": "B.E",
+        "fieldOfStudy": "Information Technology",
+        "graduationYear": "2022"
+      }
+    ],
+    "certifications": [],
+    "projects": [
+      {
+        "title": "Urmin Food and Tobacco distribution application",
+        "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite"
+        ],
+        "url": "https://github.com/kaushikkhandala/urmin-food"
+      },
+      {
+        "title": "Danatone ERP",
+        "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Hive",
+          "REST APIs"
+        ],
+        "url": "https://github.com/kaushikkhandala/danatone-erp"
+      },
+      {
+        "title": "Tent Studio",
+        "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Firebase"
+        ],
+        "url": "https://github.com/kaushikkhandala/tent-studio"
+      }
+    ]
+  },
+  "tailoredResumes": [
+    {
+      "id": "tailored_1787051914491",
+      "jobId": "job-401",
+      "jobTitle": "General Application",
+      "company": "Google",
+      "customSummary": "Summary Version 2 updated for Senior Cloud AI Engineer",
+      "prioritizedSkills": [
+        "Dart",
+        "Flutter",
+        "BLoC",
+        "Firebase",
+        "SQLite",
+        "Hive",
+        "Git",
+        "Android Studio",
+        "VSCode"
+      ],
+      "reorganizedExperience": [
+        {
+          "company": "Safal Infosoft",
+          "role": "Flutter Developer",
+          "period": "12/2023 - Present",
+          "tailoredHighlights": [
+            "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+            "Engineered offline caching layer using SQLite and Hive local key-value databases."
+          ]
+        },
+        {
+          "company": "Potenz Technology",
+          "role": "Flutter Developer",
+          "period": "01/2023 - 11/2023",
+          "tailoredHighlights": [
+            "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+            "Integrated RESTful API endpoints and state management."
+          ]
+        },
+        {
+          "company": "Potenz Technology",
+          "role": "Operations Manager",
+          "period": "07/2022 - 01/2023",
+          "tailoredHighlights": [
+            "Managed tech team operations and contributed to Flutter application development."
+          ]
+        }
+      ],
+      "keywordsOptimized": [
+        "Go",
+        "Kubernetes",
+        "Python",
+        "AI"
+      ],
+      "pdfStoragePath": "/resumes/v2.0.pdf",
+      "generatedAt": "2026-08-18T11:18:34.491Z"
+    }
+  ],
+  "resumeVersions": [
+    {
+      "id": "res_ver_1787051922163_83vmk",
+      "versionTag": "v2.0",
+      "jobId": "job-401",
+      "jobTitle": "General Application",
+      "company": "Google",
+      "changeDescription": "Generated v2.0 tailored for Google",
+      "masterSnapshot": {
+        "fullName": "Kaushik Khandala",
+        "email": "kaushikkhandalakaushik234@gmail.com",
+        "phone": "+91 8849170743",
+        "location": "Ahmedabad, India",
+        "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+        "github": "https://github.com/kaushikkhandala",
+        "portfolio": "https://kaushikkhandala.dev",
+        "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+        "explicitExperienceYears": 3.8,
+        "experienceSource": "RESUME_EXPLICIT",
+        "skills": {
+          "languages": [
+            "Dart"
+          ],
+          "frameworks": [
+            "Flutter",
+            "BLoC"
+          ],
+          "cloudAndDevOps": [
+            "Firebase"
+          ],
+          "databases": [
+            "SQLite",
+            "Hive"
+          ],
+          "tools": [
+            "Git",
+            "Android Studio",
+            "VSCode"
+          ]
+        },
+        "experience": [
+          {
+            "company": "Safal Infosoft",
+            "role": "Flutter Developer",
+            "location": "Ahmedabad, India",
+            "startDate": "12/2023",
+            "endDate": "Present",
+            "highlights": [
+              "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+              "Engineered offline caching layer using SQLite and Hive local key-value databases."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "BLoC",
+              "SQLite",
+              "Hive",
+              "Firebase"
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Flutter Developer",
+            "location": "Ahmedabad, India",
+            "startDate": "01/2023",
+            "endDate": "11/2023",
+            "highlights": [
+              "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+              "Integrated RESTful API endpoints and state management."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "REST APIs",
+              "Git"
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Operations Manager",
+            "location": "Ahmedabad, India",
+            "startDate": "07/2022",
+            "endDate": "01/2023",
+            "highlights": [
+              "Managed tech team operations and contributed to Flutter application development."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "Operations"
+            ]
+          }
+        ],
+        "education": [
+          {
+            "institution": "Sal Engineering & Technical Institute",
+            "degree": "B.E",
+            "fieldOfStudy": "Information Technology",
+            "graduationYear": "2022"
+          }
+        ],
+        "certifications": [],
+        "projects": [
+          {
+            "title": "Urmin Food and Tobacco distribution application",
+            "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "BLoC",
+              "SQLite"
+            ],
+            "url": "https://github.com/kaushikkhandala/urmin-food"
+          },
+          {
+            "title": "Danatone ERP",
+            "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "Hive",
+              "REST APIs"
+            ],
+            "url": "https://github.com/kaushikkhandala/danatone-erp"
+          },
+          {
+            "title": "Tent Studio",
+            "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "Firebase"
+            ],
+            "url": "https://github.com/kaushikkhandala/tent-studio"
+          }
+        ]
+      },
+      "tailoredPayload": {
+        "id": "tailored_1787051914491",
+        "jobId": "job-401",
+        "jobTitle": "General Application",
+        "company": "Google",
+        "customSummary": "Summary Version 2 updated for Senior Cloud AI Engineer",
+        "prioritizedSkills": [
+          "Dart",
+          "Flutter",
+          "BLoC",
+          "Firebase",
+          "SQLite",
+          "Hive",
+          "Git",
+          "Android Studio",
+          "VSCode"
+        ],
+        "reorganizedExperience": [
+          {
+            "company": "Safal Infosoft",
+            "role": "Flutter Developer",
+            "period": "12/2023 - Present",
+            "tailoredHighlights": [
+              "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+              "Engineered offline caching layer using SQLite and Hive local key-value databases."
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Flutter Developer",
+            "period": "01/2023 - 11/2023",
+            "tailoredHighlights": [
+              "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+              "Integrated RESTful API endpoints and state management."
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Operations Manager",
+            "period": "07/2022 - 01/2023",
+            "tailoredHighlights": [
+              "Managed tech team operations and contributed to Flutter application development."
+            ]
+          }
+        ],
+        "keywordsOptimized": [
+          "Go",
+          "Kubernetes",
+          "Python",
+          "AI"
+        ],
+        "pdfStoragePath": "/resumes/v2.0.pdf",
+        "generatedAt": "2026-08-18T11:18:34.491Z"
+      },
+      "formats": {
+        "pdfDataUrl": "data:application/pdf;base64,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",
+        "docxBase64": "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",
+        "jsonRepresentation": {
+          "master": {
+            "fullName": "Kaushik Khandala",
+            "email": "kaushikkhandalakaushik234@gmail.com",
+            "phone": "+91 8849170743",
+            "location": "Ahmedabad, India",
+            "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+            "github": "https://github.com/kaushikkhandala",
+            "portfolio": "https://kaushikkhandala.dev",
+            "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+            "explicitExperienceYears": 3.8,
+            "experienceSource": "RESUME_EXPLICIT",
+            "skills": {
+              "languages": [
+                "Dart"
+              ],
+              "frameworks": [
+                "Flutter",
+                "BLoC"
+              ],
+              "cloudAndDevOps": [
+                "Firebase"
+              ],
+              "databases": [
+                "SQLite",
+                "Hive"
+              ],
+              "tools": [
+                "Git",
+                "Android Studio",
+                "VSCode"
+              ]
+            },
+            "experience": [
+              {
+                "company": "Safal Infosoft",
+                "role": "Flutter Developer",
+                "location": "Ahmedabad, India",
+                "startDate": "12/2023",
+                "endDate": "Present",
+                "highlights": [
+                  "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+                  "Engineered offline caching layer using SQLite and Hive local key-value databases."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "BLoC",
+                  "SQLite",
+                  "Hive",
+                  "Firebase"
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Flutter Developer",
+                "location": "Ahmedabad, India",
+                "startDate": "01/2023",
+                "endDate": "11/2023",
+                "highlights": [
+                  "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+                  "Integrated RESTful API endpoints and state management."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "REST APIs",
+                  "Git"
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Operations Manager",
+                "location": "Ahmedabad, India",
+                "startDate": "07/2022",
+                "endDate": "01/2023",
+                "highlights": [
+                  "Managed tech team operations and contributed to Flutter application development."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "Operations"
+                ]
+              }
+            ],
+            "education": [
+              {
+                "institution": "Sal Engineering & Technical Institute",
+                "degree": "B.E",
+                "fieldOfStudy": "Information Technology",
+                "graduationYear": "2022"
+              }
+            ],
+            "certifications": [],
+            "projects": [
+              {
+                "title": "Urmin Food and Tobacco distribution application",
+                "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "BLoC",
+                  "SQLite"
+                ],
+                "url": "https://github.com/kaushikkhandala/urmin-food"
+              },
+              {
+                "title": "Danatone ERP",
+                "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "Hive",
+                  "REST APIs"
+                ],
+                "url": "https://github.com/kaushikkhandala/danatone-erp"
+              },
+              {
+                "title": "Tent Studio",
+                "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "Firebase"
+                ],
+                "url": "https://github.com/kaushikkhandala/tent-studio"
+              }
+            ]
+          },
+          "tailored": {
+            "id": "tailored_1787051914491",
+            "jobId": "job-401",
+            "jobTitle": "General Application",
+            "company": "Google",
+            "customSummary": "Summary Version 2 updated for Senior Cloud AI Engineer",
+            "prioritizedSkills": [
+              "Dart",
+              "Flutter",
+              "BLoC",
+              "Firebase",
+              "SQLite",
+              "Hive",
+              "Git",
+              "Android Studio",
+              "VSCode"
+            ],
+            "reorganizedExperience": [
+              {
+                "company": "Safal Infosoft",
+                "role": "Flutter Developer",
+                "period": "12/2023 - Present",
+                "tailoredHighlights": [
+                  "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+                  "Engineered offline caching layer using SQLite and Hive local key-value databases."
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Flutter Developer",
+                "period": "01/2023 - 11/2023",
+                "tailoredHighlights": [
+                  "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+                  "Integrated RESTful API endpoints and state management."
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Operations Manager",
+                "period": "07/2022 - 01/2023",
+                "tailoredHighlights": [
+                  "Managed tech team operations and contributed to Flutter application development."
+                ]
+              }
+            ],
+            "keywordsOptimized": [
+              "Go",
+              "Kubernetes",
+              "Python",
+              "AI"
+            ],
+            "pdfStoragePath": "/resumes/v2.0.pdf",
+            "generatedAt": "2026-08-18T11:18:34.491Z"
+          },
+          "meta": {
+            "versionTag": "v2.0",
+            "generatedAt": "2026-08-18T11:18:42.163Z",
+            "atsKeywordsCount": 4
+          }
+        }
+      },
+      "createdAt": "2026-08-18T11:18:42.163Z"
+    },
+    {
+      "id": "res_ver_1787051914476_7z5m2",
+      "versionTag": "v1.0",
+      "jobId": "job-401",
+      "jobTitle": "General Application",
+      "company": "Google",
+      "changeDescription": "Generated v1.0 tailored for Google",
+      "masterSnapshot": {
+        "fullName": "Kaushik Khandala",
+        "email": "kaushikkhandalakaushik234@gmail.com",
+        "phone": "+91 8849170743",
+        "location": "Ahmedabad, India",
+        "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+        "github": "https://github.com/kaushikkhandala",
+        "portfolio": "https://kaushikkhandala.dev",
+        "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+        "explicitExperienceYears": 3.8,
+        "experienceSource": "RESUME_EXPLICIT",
+        "skills": {
+          "languages": [
+            "Dart"
+          ],
+          "frameworks": [
+            "Flutter",
+            "BLoC"
+          ],
+          "cloudAndDevOps": [
+            "Firebase"
+          ],
+          "databases": [
+            "SQLite",
+            "Hive"
+          ],
+          "tools": [
+            "Git",
+            "Android Studio",
+            "VSCode"
+          ]
+        },
+        "experience": [
+          {
+            "company": "Safal Infosoft",
+            "role": "Flutter Developer",
+            "location": "Ahmedabad, India",
+            "startDate": "12/2023",
+            "endDate": "Present",
+            "highlights": [
+              "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+              "Engineered offline caching layer using SQLite and Hive local key-value databases."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "BLoC",
+              "SQLite",
+              "Hive",
+              "Firebase"
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Flutter Developer",
+            "location": "Ahmedabad, India",
+            "startDate": "01/2023",
+            "endDate": "11/2023",
+            "highlights": [
+              "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+              "Integrated RESTful API endpoints and state management."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "REST APIs",
+              "Git"
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Operations Manager",
+            "location": "Ahmedabad, India",
+            "startDate": "07/2022",
+            "endDate": "01/2023",
+            "highlights": [
+              "Managed tech team operations and contributed to Flutter application development."
+            ],
+            "technologiesUsed": [
+              "Flutter",
+              "Dart",
+              "Operations"
+            ]
+          }
+        ],
+        "education": [
+          {
+            "institution": "Sal Engineering & Technical Institute",
+            "degree": "B.E",
+            "fieldOfStudy": "Information Technology",
+            "graduationYear": "2022"
+          }
+        ],
+        "certifications": [],
+        "projects": [
+          {
+            "title": "Urmin Food and Tobacco distribution application",
+            "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "BLoC",
+              "SQLite"
+            ],
+            "url": "https://github.com/kaushikkhandala/urmin-food"
+          },
+          {
+            "title": "Danatone ERP",
+            "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "Hive",
+              "REST APIs"
+            ],
+            "url": "https://github.com/kaushikkhandala/danatone-erp"
+          },
+          {
+            "title": "Tent Studio",
+            "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+            "technologies": [
+              "Flutter",
+              "Dart",
+              "Firebase"
+            ],
+            "url": "https://github.com/kaushikkhandala/tent-studio"
+          }
+        ]
+      },
+      "tailoredPayload": {
+        "id": "tailored_1787051913382",
+        "jobId": "job-401",
+        "jobTitle": "General Application",
+        "company": "Google",
+        "customSummary": "Summary Version 1 for Cloud Engineer",
+        "prioritizedSkills": [
+          "Dart",
+          "Flutter",
+          "BLoC",
+          "Firebase",
+          "SQLite",
+          "Hive",
+          "Git",
+          "Android Studio",
+          "VSCode"
+        ],
+        "reorganizedExperience": [
+          {
+            "company": "Safal Infosoft",
+            "role": "Flutter Developer",
+            "period": "12/2023 - Present",
+            "tailoredHighlights": [
+              "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+              "Engineered offline caching layer using SQLite and Hive local key-value databases."
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Flutter Developer",
+            "period": "01/2023 - 11/2023",
+            "tailoredHighlights": [
+              "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+              "Integrated RESTful API endpoints and state management."
+            ]
+          },
+          {
+            "company": "Potenz Technology",
+            "role": "Operations Manager",
+            "period": "07/2022 - 01/2023",
+            "tailoredHighlights": [
+              "Managed tech team operations and contributed to Flutter application development."
+            ]
+          }
+        ],
+        "keywordsOptimized": [
+          "Go",
+          "Kubernetes"
+        ],
+        "pdfStoragePath": "/resumes/v1.0.pdf",
+        "generatedAt": "2026-08-18T11:18:33.382Z"
+      },
+      "formats": {
+        "pdfDataUrl": "data:application/pdf;base64,JVBERi0xLjcKJYGBgYEKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxMjA1Cj4+CnN0cmVhbQp4nLVXTY/jRBC9+1f4jLShu7o+uiWERBIbDlyA3FYcELsg0KzQIgR/n1eVxLGDPbuZFWPZ03Z/Vb16Va/zvtufurTLfdqR4MHS//lr9/k3b5/+fvvXbz//9Gr/x9ObV5Za5Zqstj7X/vRLR9yfvu0wC1fuOfXW8g69p3fdF7znLCKFKzfeU8J75cwDM54Hzl/2p9+702fdcOq+695f9ve9r4+lAc2YtJJo7dv61lauW+tes4kVrdrQ3uN/1kEZzwPuRW+hUgpzUtMj+poeaNCiox4pUbKDP2lfWsmUSsXF3i5WEm4u5TaKM1Y8qsQ+hJsJ37nFzk3XHd4EnFJKNUmruuWvtAnqg/oue9/b9ytfUdJqjCtZwdtIo87GeGvycoy38XnMZl6aIhRcTZRW94l+jf7ZHs+ufofMEpbvv4bX/3Svf4Tjbzp3vITj7xZtMG1H9fr+1P3wMRgHqZtJAiLwr895HWmamCVJiEdWBrFB7Yb24HSmhHfhI64sJO1BcgMakuLo9G0n60akKdxSAO7R6WpkMFxUMR/gNoA9gKYIl6qORghXAcAjxjPaAsgtaCA+4zFCBliVJeWa8jZYiPxkJ7Ow5/8AoMoVJtSBhvw/iKeOuoUA8YgYSIwf2GEFvA9CWBW5Yrla3YRQbxUCsAAeFTcIbETW6yEYnJgD1nPuKr6K89vhii+EXBu5XHqbr+G5DvCFzizIno0+I8aA76aXdmRGtIL7mOu5xz4Le5zzcoxVFDB55mCVFwRJKsE21LW6GSTJH2Y0vtQIC3lAIjDr1mwHJczJ0Aysgfzvc1o3p8gUmCXkHg5xAIPF6fwNqHvYMjiO8nEpsc53h0yN14x08873XebVWlvOSctqma1lh5IyNxC1n2iEaiRXDlAYOiHJeeAc0GF9+2eFrUF/GrU1AwTg0BSrJs5AMAV8BZNgtHPIIER0BDiopIAtEt/V6x5K9KYY1VCVfWSUC8xNUZkdRJsxHBXdOMZh19DGAbephMYNsX/weCUTUuhfCbWJEb66r6RmtNh7eBAtslRza01WZdHhutXJgOuu5mlUQucJ/s6S6OaWMLdeQQgo2xm2OTiL9L65f01ynzfGWmClO4/qfLRgKYLm/WdA8xWoFwAQKaWWYC2p8lZKSW0PpxRgiRgNhjoo3nJIBh3DLbNVVdtMLOihNpwT1vOKdkQ2t7K4bN3lFXJt9u1RQbDKKYuhBK4zRUwWTLmDJXhyhOMU8iChqeLxMzlLR/R64T5EJCfNhdujq9vEj7tyv0i3u+CEIl4l6FFuNNXqp9m2WszcZS0Ll++zMpxGrXYtgGXumpsPFcAx45zLlsINzLOZix+sFS+iOQmS3fHYZDnfFP3C5WVl45kt/w/PM+oxFKEWepboN0P9h8NEaroQPX0C0RG8hMhTk62o07IkzuPjsbsgcGll1w5dRfMa7TjVOwM8NcjpO600fqzuRDGcJ9zzTHn+xMM4c0ODTWnrxCM3WWA/Z/rBNKMR552XcBPVrVScQpJsnje53Y41+C3EctbB2YGF4hA/IfKpXHQhAtRNVs8S1BYmyUWn/qOQl8rklWhmULvqWhQNT/cWlTBS3ul/4fPS4H8Be9qLHwplbmRzdHJlYW0KZW5kb2JqCgo4IDAgb2JqCjw8Ci9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9PYmpTdG0KL04gNgovRmlyc3QgMzQKL0xlbmd0aCA1NzIKPj4Kc3RyZWFtCnic1VRLaxsxEL7vr9CxPSQrjR4zKsbgZwslNCSFlpYeNrYwW8yq2OuS/vuOtHZMsmsCvRUzeKX5Zuabh0YJKUAYI7RAEkZYDcIKpQ0KJ5QBL0ajovz851cQ5W21Cfui/Fiv9+I7Y6W4Ez+KchYPTStUMR4XZ+ysaqtt3BSdkVAJfELc7uL6sAo7MVoulkspUUrpDIuTEub8P2PxLMBn1gHxNwuao/Adain1hHXLThx2NkmfsfZov+B/xrqEmXdYQ935KW6Kteh8wGt8/Lgob+J6XrVBvJm/AwlOkiKlFGn97S2XYxeqNv6/yWX+dWwuZvisz6m9qcm7kGYgd7m8C/t42K247Qm3jKxJHx/C9ndo61V1NY3b9RVKT0wWyfOkZbszwKMBR2Ad8TC+0KWikbSeXF+XHXsuj3EeJPYdo0WwWruLxmSsVCTVkDE5joqKcIBVNrYExjnQmvrGGaA4YwtGoR2gRkReKW5o37tHr43x/Br75UBujvfeXsqIG8/5gnNmIKa21nlD2LflLI1UFpUaoOMcj4I2foBqjgmWSYE0AyEVIO8YoLxnXtJBkOwbvL3g11j2jIAOLhSY09FktZMDBTbEc85TZ09V5EEuv356+BlWeUDTcfHYvr9v0+R3F+nuJqzrahofeedJ/llvr4EEGXXNo8v7b9I0sU0bMe/CpuWXkE543I/Pnkt6DEV5f3ho8zFdqqKcVvuQn8mZLVNpVnFdNxtRfqmbSbOvTxf/6DEX6BW3fwEgM4mcCmVuZHN0cmVhbQplbmRvYmoKCjkgMCBvYmoKPDwKL1NpemUgMTAKL1Jvb3QgMiAwIFIKL0luZm8gMyAwIFIKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL1hSZWYKL0xlbmd0aCA0MgovVyBbIDEgMiAyIF0KL0luZGV4IFsgMCAxMCBdCj4+CnN0cmVhbQp4nBXEsREAIAwDsXcgRzrYfwsmDFiFgO6gwMmFG266FAeU+7cuPGkpAykKZW5kc3RyZWFtCmVuZG9iagoKc3RhcnR4cmVmCjE5NjkKJSVFT0Y=",
+        "docxBase64": "UEsDBAoAAAAAAFBaEl0AAAAAAAAAAAAAAAAFAAAAd29yZC9QSwMECgAAAAAAUFoSXQAAAAAAAAAAAAAAAAsAAAB3b3JkL19yZWxzL1BLAwQKAAAACABQWhJdxppPZfoAAAAhBAAAHAAAAHdvcmQvX3JlbHMvZG9jdW1lbnQueG1sLnJlbHOtk91OAyEQhV+FcO+yrVqNKe2NMemtWR+AsrM/cRkITI19ezF2KzUN8YLLOTOc+TI5rLefZmIf4MNoUfJFVXMGqG07Yi/5W/Ny88i3m/UrTIriRBhGF1h8gkHygcg9CRH0AEaFyjrA2OmsN4pi6XvhlH5XPYhlXa+ETz34pSfbtZL7XbvgrDk6+I+37bpRw7PVBwNIV1aIQMcJQnRUvgeS/Keuog8X19cvS67Hg9mDj3f8JThLOYjbkhCdtYSW0jOcpRzEXUkIwPYPw6zkEO6LZgGI4t3TNJyUHMKqJIK25ruVIMxKDuGhbBqQGrWfIE3DSZohxMVf33wBUEsDBAoAAAAIAFBaEl16Dk3t+QUAADYfAAARAAAAd29yZC9kb2N1bWVudC54bWzlWd1y4jYUfpUzXHS20yTGhhBCN9kSIBsmJKFxstNeClvYKrLlkWVYdnrRh+gT9kl65B9IgGYNyXZ2Nze2JaFP3/nVkXj77mPAYUplzER4UjEPqhWgoSNcFnonlfu78/1mBWJFQpdwEdKTypzGlXenb2ctVzhJQEMFgdPqe6GQZMRxfGbWYWYewiwy6xVA8DBuzSLnpOIrFbUMI3Z8GpD4IGCOFLEYqwNHBIYYj5lDjZmQrmFVzWr6FUnh0DhGJh0STklcwAXraCKiIQ6OhQyIwqb0jIDISRLtI3pEFBsxztQcsauNAkacVBIZtnKI/QUhPaWVEcpfxQxZZt1sSjfXTrqiISlHDiKMfRYtxdgVDQf9AmT6lBDTgC9NYNafZ4OuJDN8LQHL0HezSQHPmD+NaFZLWERDLGaUofB4zYJJQFi4XHgn1TxQrnm4HYC1ChB5zzPOeymSaInGnofWDycLLB3zW2DlRn4oWvw8MrZPokUEOh/LgeV+p/HqhuMTqejHJYa5NcihcWw014GsHYBQQMtch6ptDdUwNKs1oJK+vAKErNaQSjr1KtIG4Rq7IVnrSEe7IdXWkZq7Ia25EyaSyQ5QbBljJKi5WyMcGYFwKa8tk6HZcGjJ8ChirZkHq+Es5dE4rCSfAqexwGEP+exG5gFA7CrX3wrFKnKzoecSRXwS+w8Rt0tnGK8F3DxAHenCZyTcuX5H6WMo9esPB2atKeEnFQe3aSorxulbYzGaPbLvkZE+O3H6dgQXsphqtmuNw24lHYg/Fb1Ws+jpxI/7jAWo0gK24og4KF4kaUzllFZOL9v39kX/Ei4v2tfd9qCtZ6hsXkZvdzEeEa+3Dw8bzVXi5gbiZjniE5JgqTSZ+GndSfKmVav/4uHGzbWhAP4E+OnYhGazfmweVY/qtbSr7QfUJSPi7kE/dBn5UjJbZ43OWfUFZR5gRqBuP2yB9s8YHZSnPSxM/ZKFxopWUnHfM3WRjJZzPKb8ZJTOWPn5fyvioYwPRLE2iGKVEuWzOo9sNee0QL2gRB83rJcMmg3krXLkh7c35z3b7t9ctwdg319dtW9/L6e7x/7RrR3V12LCqm7gVS3Fy04CPNLM4UN2VgMTsMqFDheJC73QYyGl8jM8v0dz3fU6F9f9jrbVZX8wsOEHEkQ/Q+fmati76113+j27nPUek34Rk3WEpGBPGOdxCx6x+D8dp4vlyh6c80RhdtuDs4HoYJNJOiIx3QP71wFT+L5gU3xiPtmDduhKwVywVeIysQcf7A7WGq/QuR7lgt5vw95tH12qt4tDrRDFSqXzgjbOrQtdOqUcD8ES/vnrb7DJmHDcBsdpefOEA7J0XbaJ6pHZrB43XnCfA4A3WNmjAmqwD0PdH6oft3STAYvVkEjiSRL5GZUwCXJh+JQXv6suxvrugmdOM59QZq/fGJLm8QYdHJfSwVnCuAJddsb7ESdK31cUEQokijhzsvsiSPQROI1ZfQunKAQkJB5NL95wX1/EMYyIM6HYwbCGQa2ksw9el1aLXZC6gFU8Vk8UHOL4WoGczFGzmTKzhJdqT+c84MLBKJnQ+T4ullDQpwat0qfUt1vG+7qyw1AoGn6CO+r4IS7vzb+iBFE1iwRhZl+vLEEUlnIhECOGYo0pUQlWE3joTziN09qP3dipFxfbdebehbGzOkhv/q8sDfTzDIjKu+3Zd+OEQ3vYB0yOkcDsGKc6W02m302s32B453vHVSrdNxDsRzrELQz26qsM9sxOLig0Dj5IAGJpRO2sjgiVZKNEu7QSmwoFcLOE8UVc+Rso1Hvd+077Duv0ry8gzw56WJSlVbj+U0obq1QUlom73X0uPx/wxdWB3jqyLSNlx5z05BArptDt4I0O0M1hGVNH5Q7i2ZraDEmYx/p/1lnLx+9Gs9bU30Iy9E4kIaSShKmMe+RdES2mEhGKiTrFb8k8Xy1aI6GUCBZNTsfLMR+9kEpsVtMlxgLT3LLppXGyiPvIu06Cu3lE05YrnPeS6TygK8UhUw6SrTUKoxZiGcWFr7H8y/v0X1BLAwQKAAAACABQWhJdtOclsuMCAACjEAAADwAAAHdvcmQvc3R5bGVzLnhtbOVWW0/bMBj9K1HeIZemBSoK2goVSNOGGGjPruM0Fo6d2Q6l/PrZiZ2WpqGFBiZtb/0uOT7nu9Q+PX/KiPOIuMCMjtzg0HcdRCGLMZ2N3Pu7ycGx6wgJaAwIo2jkLpBwz89O50MhFwQJJ4PD6xllHEyJis6DyJkHfddRqFQMMzhyUynzoecJmKIMiEOWI6qCCeMZkMrkMy8D/KHIDyDLciDxFBMsF17o+wMLw3dBYUmCIbpgsMgQleX3HkdEITIqUpwLizbfBW3OeJxzBpEQqhIZqfAygGkNE0QNoAxDzgRL5KESYxiVUOrzwC9/ZWQJ0H8bQGgBdPljBi9QAgoihTb5DTemp8181fQa2WXvnPlQLnLVtBxwMOMgT13HhK7jkXuHJUHlURRkOvkREOstz5gCgeIf1Ea+6+qRKkTRk9zk/z0pS+wZxiWVZ5vYH1RJ4nksXvo8k+0ZertKuEJAz3HQUGECTtClEsgI4zY3vDyKvvatIOvthU2JlW9PiWGrxPCTJYYbuhh20cVeq8Teh0kMJtHF0XFDYrRBYtSBxKhVYtSlRFwaeCy8V3q6p5R+q5T+JwzknuQHreQHnzBq7yX/U3JGZw3qxt0h72mFVc7Pe8l+w0Le1JF1zjrqLMPbuC85ttOAqYKDEvGXDVcxTjB9aHa8jmw63VymNcUJo7JKLPANx4yrJ4zNPTkxEZriGP1KEb1XWK2D4PcHvbG5mArr1I+Q6t7dXvDNSieMScokukUJ4uqF17zaE5Ph8DqlK+kCZfgKxzGiWyqhHqLyC8Gz+jRRqDYIyHEu99kNq/5OTXm7cKmj24ZNz4T1r8KOVdn3r0NuXkU5gPr/Zj4EieqkmgotRx2N9FVTG7eFfnSDQjJTHPN5420V+huuLL+Leaqlr1fVJjg6w1lWZ+dxait0Z8P2keW5pPHr24aqhH9x2Yz2jbtmZb951VZA/7NNW1e+XlIT72TPVlv3d9fM/hJnfwBQSwMECgAAAAAAUFoSXQAAAAAAAAAAAAAAAAkAAABkb2NQcm9wcy9QSwMECgAAAAgAUFoSXZHP9m83AQAAgwIAABEAAABkb2NQcm9wcy9jb3JlLnhtbKWSXWvCMBSG/0rJfZvGblJKG2EbXk0YTNnYXUiOGtZ8kGRW//3SqlWZd7tM3icP7zltPdurNtmB89LoBpEsRwloboTUmwatlvO0RIkPTAvWGg0NOoBHM1pzW3Hj4M0ZCy5I8En0aF9x26BtCLbC2PMtKOazSOgYro1TLMSj22DL+DfbAJ7k+RQrCEywwHAvTO1oRCel4KPS/rh2EAiOoQUFOnhMMoIvbACn/N0HQ3JFKhkOFu6i53Ck916OYNd1WVcMaOxP8Ofi9X0YNZW63xQHRGvBK+6ABePoSqeaKRA1vrrsF9gyHxZx02sJ4ulwxf3NetzBTvZfiZKBGI/1aeijG0QSy1bH0c7JR/H8spwjOskn0zQvU1IuCalIWRVF9vCYf/XVbhwXqTqV+Jf1LKFD89sfh/4CUEsDBAoAAAAIAFBaEl0eKelacAIAAGQMAAASAAAAd29yZC9udW1iZXJpbmcueG1szZdLbtswEIavInDvUHLkB4QoQdsghYu+gKYHoCXaJsIXSEqKz9BFd+22Z+tJOpQs+VEgsGUE8Ma0ODPf/BQ5Q+jm7lnwoKTGMiVTFF2FKKAyUzmTyxR9f3wYTFFgHZE54UrSFK2pRXe3N1UiCzGnBtwCkSWzpVSGzDk4VFEcVNEoqHQUowDo0iaVzlK0ck4nGNtsRQWxV4JlRlm1cFeZElgtFiyjuFImx8MwCut/2qiMWgs53hFZEtvixP80pakE40IZQRw8miUWxDwVegB0TRybM87cGtjhuMWoFBVGJhvEoBPkQ5JG0GZoI8wxeZuQe5UVgkpXZ8SGctCgpF0xvV1GXxoYVy2kfGkRpeDbLYji8/bg3pAKhi3wGPl5EyR4o/xlYhQesSMe0UUcI2E/Z6tEECa3iXu9mp2XG41OAwwPAXp53ua8N6rQWxo7jzaTTx3LF/0JrM0m7y7Nnifm24poinzLIXPrDMnc50IEe0+zHFoX8m0nMRS6lfGTTXd6s3DUvDWUPKUorCmi4I59pCXlj2tNAVQSDgrXc8PyT97GvQ1h78tLDg4MBh9dJ3BQhlDLJfUpvU+dr8VETRw0xwfRTc4LzqnriI/0uTP9/f2zm/+QtbOcLjbu+qvxA5M52Px0iiZDryRZEbmsm/T1OPS+eOOMa9ah+Oh1xP84VXwUxz3UD19F/a8/p6ofRuMe6q8v5OAMp9Me6uMLOTkgtof60YWcnPi6T9WOL+TkjMI+VTu5FPWTPlU7vRD14/i4qsV7N+JGVVD/NtfjwQ06yw8WAZQv8CEAtyDdufO6Je/YtlF4L6x+lj453vk+uP0HUEsDBAoAAAAAAFBaEl0AAAAAAAAAAAAAAAAGAAAAX3JlbHMvUEsDBAoAAAAIAFBaEl0fo5KW5gAAAM4CAAALAAAAX3JlbHMvLnJlbHOtks9KAzEQh18lzL0721ZEpGkvUuhNpD5ASGZ3g80fJlOtb28oilbq2kOPmfzmyzdDFqtD2KlX4uJT1DBtWlAUbXI+9hqet+vJHayWiyfaGamJMvhcVG2JRcMgku8Rix0omNKkTLHedImDkXrkHrOxL6YnnLXtLfJPBpwy1cZp4I2bgtq+Z7qEnbrOW3pIdh8oypknfiUq2XBPouEtsUP3WW4qFvC8zexym78nxUBinBGDNjFNMtduFk/lW6i6PNZyOSbGhObXXA8dhKIjN65kch4zurmmkd0XSeGfFR0zX0p48jGXH1BLAwQKAAAACABQWhJdoI6OpZoBAAA4CAAAEwAAAFtDb250ZW50X1R5cGVzXS54bWy1VstOwzAQ/JUoV9S4cEAIteXA4wgc4ANce5MaYq9lbwr8Pev0IQWaUqC5ZT0zOxPvRsrk6t3W2RJCNOim+WkxzjNwCrVx1TR/frobXeRXs8nTh4eYMdXFab4g8pdCRLUAK2OBHhwjJQYrictQCS/Vq6xAnI3H50KhI3A0otQjn01uoJRNTdn16jy1nubGJr53VZ7dvvPxKk6qxV7Fi4eupD34teYnydz6jiLV+xWVKTuKVO9XxGV1wvfYUfFZr0p6XxsliYli6fSXOYzWMygC1C0nLoyP3wwYjQc5fBWm+o/JsCyNAo2qsSwpcF42kdmg77hJxwQ1UXttD7yhwWj4j88bBu0DKoiRl9vWxRax0rjVzTzKQPfScm+R6GJLWb/uIDkifdQQdwdYYf+y3yyCwgAjNvYQyOzw44CPjEaRiMd8YdVEQnuYdUs9pjmkbdKgD7Ln1oNO2jV2DoGfdw97Cw8aokQkh9S3cVt40BA8kz0ZNuiwnx0Q8VPfh7dGB42g0CagJ8IGHXgbuJGc19C3DWt4E0K0vwKzT1BLAwQKAAAACABQWhJdWHnbIpIAAADkAAAAEwAAAGRvY1Byb3BzL2N1c3RvbS54bWydzkEKwjAQheGrlNnbVBcipWk34tpFdR/SaRtoZkImLfb2RgQP4PLxw8drupdfig2jOCYNx7KCAsny4GjS8OhvhwsUkgwNZmFCDTsKdG1zjxwwJodSZIBEw5xSqJUSO6M3UuZMuYwcvUl5xknxODqLV7arR0rqVFVnZVdJ7A/hx8HXq7f0Lzmw/byTZ7+H7Kn2DVBLAwQKAAAACABQWhJd4vyd2pMAAADmAAAAEAAAAGRvY1Byb3BzL2FwcC54bWydzkEKwjAQheGrhOxtqguR0rQbce2iug/JtA00MyETS3t7I4IHcPn44eO1/RYWsUJiT6jlsaqlALTkPE5aPobb4SIFZ4POLISg5Q4s+669J4qQsgcWBUDWcs45NkqxnSEYrkrGUkZKweQy06RoHL2FK9lXAMzqVNdnBVsGdOAO8QfKr9is+V/Ukf384+ewx+Kp7g1QSwMECgAAAAgAUFoSXZyJyZHOAQAArQYAABIAAAB3b3JkL2Zvb3Rub3Rlcy54bWzVlM1O4zAQx18l8r11UgFaRU05gEDcEN19AOM4jYXtsWwnoW+/k8RNuiyqCj1xib9mfvOfmdjr23etklY4L8EUJFumJBGGQynNriB/fj8sfpHEB2ZKpsCIguyFJ7ebdZdXAMFAED5BgvF5Z3lB6hBsTqnntdDML7XkDjxUYclBU6gqyQXtwJV0lWbpMLMOuPAew90x0zJPIk7/TwMrDB5W4DQLuHQ7qpl7a+wC6ZYF+SqVDHtkpzcHDBSkcSaPiMUkqHfJR0FxOHi4c+KOLvfAGy1MGCJSJxRqAONraec0vkvDw/oAaU8l0WpFphZkV5f14N6xDocZeI78cnTSalR+mpilZ3SkR0we50j4N+ZBiWbSzIG/VZqj4mbXXwOsPgLs7rLmPDpo7EyTl9GezNvE6i/2F1ixycep+cvEbGtm8QZqnj/tDDj2qlARtizBqif9b02On5yky8PeooUXljkWwBHckmVBFtlgaIfPs+sHbxnHCGjAqiDwdqe9sZJ9zqurafHS9CFZE4DQzZpO7uMnzrdhr/roLVMFeYhqXkQlHL6ZIjpG42o+jvsTbpI9HdBBM529Pk2XgwnSNMMrs/2YevoTMv80g1NVOFr4zV9QSwMECgAAAAgAUFoSXdJ3/LdtAAAAewAAAB0AAAB3b3JkL19yZWxzL2Zvb3Rub3Rlcy54bWwucmVsc02MQQ4CIQxFr0K6d4oujDHDzG4OYPQADVYgDoVQYjy+LF3+vPf+vH7zbj7cNBVxcJwsGBZfnkmCg8d9O1xgXeYb79SHoTFVNSMRdRB7r1dE9ZEz6VQqyyCv0jL1MVvASv5NgfFk7Rnb/wfg8gNQSwMECgAAAAgAUFoSXT9Kjo3BAQAAkgYAABEAAAB3b3JkL2VuZG5vdGVzLnhtbM2U227jIBCGX8XiPsGOutXKitOLHla9q5rdB6AYx6jAIMD25u13fAjOtlWUNje9MaeZb/6ZMaxv/mqVtMJ5CaYg2TIliTAcSml2Bfnz+2Hxk9xs1l0uTGkgCJ+gvfF5Z3lB6hBsTqnntdDML7XkDjxUYclBU6gqyQXtwJV0lWbpMLMOuPAe4bfMtMyTCaff08AKg4cVOM0CLt2OauZeG7tAumVBvkglwx7Z6fUBAwVpnMknxCIK6l3yUdA0HDzcOXFHlzvgjRYmDBGpEwo1gPG1tHMaX6XhYX2AtKeSaLUisQXZ1WU9uHOsw2EGniO/HJ20GpWfJmbpGR3pEdHjHAn/xzwo0UyaOfCXSnNU3OzH5wCrtwC7u6w5vxw0dqbJy2iP5jWyjPgUa2rycWr+MjHbmlm8gZrnjzsDjr0oVIQtS7DqSf9bk6MXJ+nysLdo4IVljgVwBLdkWZBFNtjZ4fPk+sFbxjEAGrAqCLzcaW+sZJ/y6iounps+ImsCELpZ0+g+fqb5NuxVH71lqiD3o5hnUQmH76OY/CZbEU+n7QiLouMBHRTT6PRRqhxMkKYZHpjt27TT75/1h/pPVGCe+80/UEsDBAoAAAAIAFBaEl3Sd/y3bQAAAHsAAAAcAAAAd29yZC9fcmVscy9lbmRub3Rlcy54bWwucmVsc02MQQ4CIQxFr0K6d4oujDHDzG4OYPQADVYgDoVQYjy+LF3+vPf+vH7zbj7cNBVxcJwsGBZfnkmCg8d9O1xgXeYb79SHoTFVNSMRdRB7r1dE9ZEz6VQqyyCv0jL1MVvASv5NgfFk7Rnb/wfg8gNQSwMECgAAAAgAUFoSXU2fysqhAQAAcwUAABEAAAB3b3JkL3NldHRpbmdzLnhtbKWU3W7bMAyFX8XQfSK7WIvBqFt0K9b1YthFtwdgJdkWIlGCJNvL24+O47g/QJE0V5JB8TtHpMXr23/WZL0KUTusWLHOWaZQOKmxqdjfPz9WX1kWE6AE41BVbKsiu725HsqoUqJDMSMAxnLwomJtSr7kPIpWWYhrq0Vw0dVpLZzlrq61UHxwQfKLvMh3Ox+cUDES6DtgD5HtcfY9zXmFFKxdsJDoMzTcQth0fkV0D0k/a6PTltj51YxxFesClnvE6mBoTCknQ/tlzgjH6E4p9050VmHaKfKgDHlwGFvtl2t8lkbBdob0H12it4YdWlB8Oa8H9wEGWhbgMfbllGTN5PxjYpEf0ZERccg4xsJrzdmJBY2L8KdK86K4xeVpgIu3AN+c15yH4Dq/0PR5tEfcHFjjuz6BtW/yy6vF88w8teDpBVpRPjboAjwbckQty6jq2fhbs3HiSB29ge03EJuGaoFyl8bHkOoV3qH8LeVPBZKmWTaUPZiK1WCiYrsz05RYdk/TAJtPFpeMtgiWpF8NlF9OqjHUhRNKPkryRZMv8/LmP1BLAwQKAAAACABQWhJdi4Y5xMUBAADGCAAAEQAAAHdvcmQvY29tbWVudHMueG1spdTdcuIgGAbgW3E4V5JYUzfTtCed7fR42wuggMI0/Ayg0btfUiVJl51OgkfqJN+Tl9fAw9NJNIsjNZYrWYN8lYEFlVgRLvc1eH/7vdyChXVIEtQoSWtwphY8PT60FVZCUOnswgPSVvhUA+acriC0mFGB7EpwbJRVO7fy90K123FMITGo9TYssvwOYoaMoyfQG/lsZAN/wW0MFQlQnsEij6n1bKqEXaoIukuCfKpI2qRJ/1lcmSYVsXSfJq1jaZsmRa+TwBGkNJX+4k4ZgZz/afZQIPN50EsPa+T4B2+4O3szKwODuPxMSOSnekGsyWzhHgpFaLMmQVE1OBhZXeeX/XwXvbrMXz/ChJmy/svIs8KHbjt/rRwa2vgulLSMa9vXmar5iywgx58WcRRNuK/V+cTt0ipDur6yr2/aKEyt9R0+X6ocwCnxr/2L5pL8ZzHPJvwjHdFPTInw/ZkhifBv4fDgpGpG5eYTD5AAFBFQYjrxwA/G9mpAPOzQzuETt0Zwyt7hZOSkhRkBljjCZilF6BV2s8ghhiwbi3ReqE3PncWoI72/bSO8GHXQg8Zv016HY62V8xaYlf+2ru1tYf4wpCmAj38BUEsDBAoAAAAIAFBaEl3Sd/y3bQAAAHsAAAAcAAAAd29yZC9fcmVscy9jb21tZW50cy54bWwucmVsc02MQQ4CIQxFr0K6d4oujDHDzG4OYPQADVYgDoVQYjy+LF3+vPf+vH7zbj7cNBVxcJwsGBZfnkmCg8d9O1xgXeYb79SHoTFVNSMRdRB7r1dE9ZEz6VQqyyCv0jL1MVvASv5NgfFk7Rnb/wfg8gNQSwMECgAAAAgAUFoSXWPtXtYdAQAAQwMAABIAAAB3b3JkL2ZvbnRUYWJsZS54bWyd0d1uwiAUB/BXIdwrtZmNaazeLEt2vz0AArVEDqfh4NS3H622a+KN3RUQ8v/lfGz3V3DsxwSy6Cu+WmacGa9QW3+s+PfXx2LDGUXptXToTcVvhvh+t72UNfpILKU9laAq3sTYlkKQagxIWmJrfPqsMYCM6RmOAmQ4nduFQmhltAfrbLyJPMsK/mDCKwrWtVXmHdUZjI99XgTjkoieGtvSoF1e0S4YdBtQGaLUMbi7B9L6kVm9PUFgVUDCOi5TM4+KeirFV1l/A/cHrOcB+RNQKHOdZ2wehkjJqWP1PKcYHasnzv+KmQCko25mKfkwV9FlZZSNpGYqmnlFrUfuBt2MQJWfR49BHlyS0tZZWhzrYXafXHew+zLY0AIXu19QSwMECgAAAAgAUFoSXdJ3/LdtAAAAewAAAB0AAAB3b3JkL19yZWxzL2ZvbnRUYWJsZS54bWwucmVsc02MQQ4CIQxFr0K6d4oujDHDzG4OYPQADVYgDoVQYjy+LF3+vPf+vH7zbj7cNBVxcJwsGBZfnkmCg8d9O1xgXeYb79SHoTFVNSMRdRB7r1dE9ZEz6VQqyyCv0jL1MVvASv5NgfFk7Rnb/wfg8gNQSwECFAAKAAAAAABQWhJdAAAAAAAAAAAAAAAABQAAAAAAAAAAABAAAAAAAAAAd29yZC9QSwECFAAKAAAAAABQWhJdAAAAAAAAAAAAAAAACwAAAAAAAAAAABAAAAAjAAAAd29yZC9fcmVscy9QSwECFAAKAAAACABQWhJdxppPZfoAAAAhBAAAHAAAAAAAAAAAAAAAAABMAAAAd29yZC9fcmVscy9kb2N1bWVudC54bWwucmVsc1BLAQIUAAoAAAAIAFBaEl16Dk3t+QUAADYfAAARAAAAAAAAAAAAAAAAAIABAAB3b3JkL2RvY3VtZW50LnhtbFBLAQIUAAoAAAAIAFBaEl205yWy4wIAAKMQAAAPAAAAAAAAAAAAAAAAAKgHAAB3b3JkL3N0eWxlcy54bWxQSwECFAAKAAAAAABQWhJdAAAAAAAAAAAAAAAACQAAAAAAAAAAABAAAAC4CgAAZG9jUHJvcHMvUEsBAhQACgAAAAgAUFoSXZHP9m83AQAAgwIAABEAAAAAAAAAAAAAAAAA3woAAGRvY1Byb3BzL2NvcmUueG1sUEsBAhQACgAAAAgAUFoSXR4p6VpwAgAAZAwAABIAAAAAAAAAAAAAAAAARQwAAHdvcmQvbnVtYmVyaW5nLnhtbFBLAQIUAAoAAAAAAFBaEl0AAAAAAAAAAAAAAAAGAAAAAAAAAAAAEAAAAOUOAABfcmVscy9QSwECFAAKAAAACABQWhJdH6OSluYAAADOAgAACwAAAAAAAAAAAAAAAAAJDwAAX3JlbHMvLnJlbHNQSwECFAAKAAAACABQWhJdoI6OpZoBAAA4CAAAEwAAAAAAAAAAAAAAAAAYEAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAAoAAAAIAFBaEl1YedsikgAAAOQAAAATAAAAAAAAAAAAAAAAAOMRAABkb2NQcm9wcy9jdXN0b20ueG1sUEsBAhQACgAAAAgAUFoSXeL8ndqTAAAA5gAAABAAAAAAAAAAAAAAAAAAphIAAGRvY1Byb3BzL2FwcC54bWxQSwECFAAKAAAACABQWhJdnInJkc4BAACtBgAAEgAAAAAAAAAAAAAAAABnEwAAd29yZC9mb290bm90ZXMueG1sUEsBAhQACgAAAAgAUFoSXdJ3/LdtAAAAewAAAB0AAAAAAAAAAAAAAAAAZRUAAHdvcmQvX3JlbHMvZm9vdG5vdGVzLnhtbC5yZWxzUEsBAhQACgAAAAgAUFoSXT9Kjo3BAQAAkgYAABEAAAAAAAAAAAAAAAAADRYAAHdvcmQvZW5kbm90ZXMueG1sUEsBAhQACgAAAAgAUFoSXdJ3/LdtAAAAewAAABwAAAAAAAAAAAAAAAAA/RcAAHdvcmQvX3JlbHMvZW5kbm90ZXMueG1sLnJlbHNQSwECFAAKAAAACABQWhJdTZ/KyqEBAABzBQAAEQAAAAAAAAAAAAAAAACkGAAAd29yZC9zZXR0aW5ncy54bWxQSwECFAAKAAAACABQWhJdi4Y5xMUBAADGCAAAEQAAAAAAAAAAAAAAAAB0GgAAd29yZC9jb21tZW50cy54bWxQSwECFAAKAAAACABQWhJd0nf8t20AAAB7AAAAHAAAAAAAAAAAAAAAAABoHAAAd29yZC9fcmVscy9jb21tZW50cy54bWwucmVsc1BLAQIUAAoAAAAIAFBaEl1j7V7WHQEAAEMDAAASAAAAAAAAAAAAAAAAAA8dAAB3b3JkL2ZvbnRUYWJsZS54bWxQSwECFAAKAAAACABQWhJd0nf8t20AAAB7AAAAHQAAAAAAAAAAAAAAAABcHgAAd29yZC9fcmVscy9mb250VGFibGUueG1sLnJlbHNQSwUGAAAAABYAFgB8BQAABB8AAAAA",
+        "jsonRepresentation": {
+          "master": {
+            "fullName": "Kaushik Khandala",
+            "email": "kaushikkhandalakaushik234@gmail.com",
+            "phone": "+91 8849170743",
+            "location": "Ahmedabad, India",
+            "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+            "github": "https://github.com/kaushikkhandala",
+            "portfolio": "https://kaushikkhandala.dev",
+            "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+            "explicitExperienceYears": 3.8,
+            "experienceSource": "RESUME_EXPLICIT",
+            "skills": {
+              "languages": [
+                "Dart"
+              ],
+              "frameworks": [
+                "Flutter",
+                "BLoC"
+              ],
+              "cloudAndDevOps": [
+                "Firebase"
+              ],
+              "databases": [
+                "SQLite",
+                "Hive"
+              ],
+              "tools": [
+                "Git",
+                "Android Studio",
+                "VSCode"
+              ]
+            },
+            "experience": [
+              {
+                "company": "Safal Infosoft",
+                "role": "Flutter Developer",
+                "location": "Ahmedabad, India",
+                "startDate": "12/2023",
+                "endDate": "Present",
+                "highlights": [
+                  "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+                  "Engineered offline caching layer using SQLite and Hive local key-value databases."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "BLoC",
+                  "SQLite",
+                  "Hive",
+                  "Firebase"
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Flutter Developer",
+                "location": "Ahmedabad, India",
+                "startDate": "01/2023",
+                "endDate": "11/2023",
+                "highlights": [
+                  "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+                  "Integrated RESTful API endpoints and state management."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "REST APIs",
+                  "Git"
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Operations Manager",
+                "location": "Ahmedabad, India",
+                "startDate": "07/2022",
+                "endDate": "01/2023",
+                "highlights": [
+                  "Managed tech team operations and contributed to Flutter application development."
+                ],
+                "technologiesUsed": [
+                  "Flutter",
+                  "Dart",
+                  "Operations"
+                ]
+              }
+            ],
+            "education": [
+              {
+                "institution": "Sal Engineering & Technical Institute",
+                "degree": "B.E",
+                "fieldOfStudy": "Information Technology",
+                "graduationYear": "2022"
+              }
+            ],
+            "certifications": [],
+            "projects": [
+              {
+                "title": "Urmin Food and Tobacco distribution application",
+                "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "BLoC",
+                  "SQLite"
+                ],
+                "url": "https://github.com/kaushikkhandala/urmin-food"
+              },
+              {
+                "title": "Danatone ERP",
+                "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "Hive",
+                  "REST APIs"
+                ],
+                "url": "https://github.com/kaushikkhandala/danatone-erp"
+              },
+              {
+                "title": "Tent Studio",
+                "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+                "technologies": [
+                  "Flutter",
+                  "Dart",
+                  "Firebase"
+                ],
+                "url": "https://github.com/kaushikkhandala/tent-studio"
+              }
+            ]
+          },
+          "tailored": {
+            "id": "tailored_1787051913382",
+            "jobId": "job-401",
+            "jobTitle": "General Application",
+            "company": "Google",
+            "customSummary": "Summary Version 1 for Cloud Engineer",
+            "prioritizedSkills": [
+              "Dart",
+              "Flutter",
+              "BLoC",
+              "Firebase",
+              "SQLite",
+              "Hive",
+              "Git",
+              "Android Studio",
+              "VSCode"
+            ],
+            "reorganizedExperience": [
+              {
+                "company": "Safal Infosoft",
+                "role": "Flutter Developer",
+                "period": "12/2023 - Present",
+                "tailoredHighlights": [
+                  "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+                  "Engineered offline caching layer using SQLite and Hive local key-value databases."
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Flutter Developer",
+                "period": "01/2023 - 11/2023",
+                "tailoredHighlights": [
+                  "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+                  "Integrated RESTful API endpoints and state management."
+                ]
+              },
+              {
+                "company": "Potenz Technology",
+                "role": "Operations Manager",
+                "period": "07/2022 - 01/2023",
+                "tailoredHighlights": [
+                  "Managed tech team operations and contributed to Flutter application development."
+                ]
+              }
+            ],
+            "keywordsOptimized": [
+              "Go",
+              "Kubernetes"
+            ],
+            "pdfStoragePath": "/resumes/v1.0.pdf",
+            "generatedAt": "2026-08-18T11:18:33.382Z"
+          },
+          "meta": {
+            "versionTag": "v1.0",
+            "generatedAt": "2026-08-18T11:18:34.469Z",
+            "atsKeywordsCount": 2
+          }
+        }
+      },
+      "createdAt": "2026-08-18T11:18:34.477Z"
+    }
+  ],
+  "coverLetters": [],
+  "coverLetterVersions": [],
+  "applications": [],
+  "emails": [],
+  "settings": {
+    "countryFilter": [
+      "AU",
+      "CA",
+      "DE"
+    ],
+    "minimumSalary": 110000,
+    "remoteOnly": false,
+    "visaRequired": true,
+    "targetKeywords": [
+      "Software Engineer",
+      "Full Stack Engineer",
+      "Backend Engineer",
+      "TypeScript",
+      "Node.js"
+    ],
+    "blacklistedCompanies": [
+      "ScamCorp",
+      "Unpaid Internships Inc"
+    ],
+    "whitelistedCompanies": [
+      "Atlassian",
+      "Canva",
+      "Shopify",
+      "SAP",
+      "Zendesk",
+      "Amazon",
+      "Google"
+    ],
+    "dailyApplicationLimit": 10,
+    "automationMode": "MANUAL_APPROVAL",
+    "schedulerFrequencyHours": 24,
+    "enableEmailMonitor": true
+  },
+  "searchHistory": []
+}

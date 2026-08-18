@@ -8,6 +8,7 @@ import { JobRepository } from '../../repositories/JobRepository';
 import { MasterResume, JobListing, JobLifecycleStatus } from '@sentinel/types';
 
 describe('End-to-End Scrape & Discovery Pipeline Spec Suite', () => {
+  jest.setTimeout(30000);
   const sampleResume: MasterResume = {
     fullName: 'Kaushik Khandala',
     email: 'kaushik@example.com',

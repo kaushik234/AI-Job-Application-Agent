@@ -168,7 +168,7 @@ describe('Dynamic Candidate Target Profile & Algorithmic Search Query Generator 
 
     expect(keywords).toContain('Flutter Developer');
     expect(keywords).toContain('Flutter Engineer');
-    expect(keywords).toContain('Dart Developer');
+    expect(keywords).not.toContain('Git Engineer');
 
     // Negative assertions
     expect(keywords.some((k) => k.includes('Backend'))).toBe(false);

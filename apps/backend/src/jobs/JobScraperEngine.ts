@@ -89,6 +89,11 @@ export interface SearchEngineCrawlReport {
     afterVerification: number;
     afterCandidateMatching: number;
     afterApplyDecision: number;
+    roleRelevant: number;
+    verifiedActive: number;
+    recommended: number;
+    consider: number;
+    rejected: number;
     recommendedJobs: number;
     considerJobs: number;
     rejectedJobs: number;
@@ -96,6 +101,7 @@ export interface SearchEngineCrawlReport {
   };
   debug: {
     queriesGenerated: string[];
+    queryExplanations?: any[];
     rawJobsCollected: number;
     afterQueryFilter: number;
     afterRoleRelevance: number;
@@ -220,6 +226,11 @@ export class JobScraperEngine {
           afterVerification: 0,
           afterCandidateMatching: 0,
           afterApplyDecision: 0,
+          roleRelevant: 0,
+          verifiedActive: 0,
+          recommended: 0,
+          consider: 0,
+          rejected: 0,
           recommendedJobs: 0,
           considerJobs: 0,
           rejectedJobs: 0,
@@ -579,6 +590,7 @@ export class JobScraperEngine {
       const matchScore = job.matchScore ?? 50;
 
       if (rec === 'DO_NOT_APPLY' || rec === 'SKIP') {
+        job.applicationDecision = 'DO_NOT_APPLY' as any;
         rejectedJobs.push(job);
         logRejection(
           job,
@@ -589,10 +601,13 @@ export class JobScraperEngine {
           job.matchScore
         );
       } else if (matchScore >= 60 || rec === 'APPLY_NOW' || rec === 'TAILOR_AND_APPLY' || rec === 'HIGH_PRIORITY' || rec === 'GOOD_MATCH') {
+        job.applicationDecision = 'APPLY' as any;
         recommendedJobs.push(job);
       } else if (matchScore >= 40 || rec === 'CONSIDER') {
+        job.applicationDecision = 'CONSIDER' as any;
         considerJobs.push(job);
       } else {
+        job.applicationDecision = 'DO_NOT_APPLY' as any;
         rejectedJobs.push(job);
         logRejection(
           job,
@@ -606,10 +621,19 @@ export class JobScraperEngine {
     });
 
     const qualifyingJobs = [...recommendedJobs, ...considerJobs];
-    const returnedJobs = qualifyingJobs.length > 0 ? qualifyingJobs.slice(0, 50) : scoredRawJobs.slice(0, 50);
+    const initialReturnedJobs = qualifyingJobs.slice(0, 50);
+
+    // Absolute zero-rejected-job safety filter
+    const returnedJobs = initialReturnedJobs.filter((job) => {
+      const dec = (job.applicationDecision || job.recommendation || '').toUpperCase();
+      const status = (job.verificationStatus || job.jobStatus || '').toUpperCase();
+      const isRejectedDecision = ['DO_NOT_APPLY', 'REJECTED', 'SKIP'].includes(dec);
+      const isInvalidStatus = ['EXPIRED', 'INVALID_URL', 'SOURCE_MISMATCH', 'COUNTRY_MISMATCH', 'ROLE_NOT_RELEVANT', 'SEARCH_QUERY_MISMATCH', 'NOT_APPLYABLE'].includes(status);
+      return !isRejectedDecision && !isInvalidStatus;
+    });
 
     // Build discovery telemetry per provider
-    const discoveryTelemetry: Record<string, { attempted: number; succeeded: number; failed: number; timedOut: number; jobs: number }> = {};
+    const discoveryTelemetry: Record<string, any> = {};
     this.providers.forEach((p) => {
       const pKey = p.platform.toLowerCase();
       const pInfo = providerBreakdown[p.platform];
@@ -624,6 +648,10 @@ export class JobScraperEngine {
       };
     });
 
+    discoveryTelemetry.generatedQueries = derived.queryExplanations.map((e) => e.query);
+    discoveryTelemetry.queryEvidence = derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence }));
+    discoveryTelemetry.queryConfidence = derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence }));
+
     const pipeline = {
       rawJobsCollected: rawJobs.length,
       afterDeduplication: deduplicated.length,
@@ -633,14 +661,27 @@ export class JobScraperEngine {
       afterVerification: verifiedActiveJobs.length,
       afterCandidateMatching: scoredRawJobs.length,
       afterApplyDecision: qualifyingJobs.length,
+      roleRelevant: roleRelevantJobs.length,
+      verifiedActive: verifiedActiveJobs.length,
+      recommended: recommendedJobs.length,
+      consider: considerJobs.length,
+      qualifying: qualifyingJobs.length,
+      rejected: rejectedJobs.length,
       recommendedJobs: recommendedJobs.length,
       considerJobs: considerJobs.length,
       rejectedJobs: rejectedJobs.length,
       returned: returnedJobs.length,
+      generatedQueries: derived.queryExplanations.map((e) => e.query),
+      queryEvidence: derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence })),
+      queryConfidence: derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence })),
     };
 
     const debug = {
       queriesGenerated: activeSubQueries,
+      generatedQueries: derived.queryExplanations.map((e) => e.query),
+      queryEvidence: derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence })),
+      queryConfidence: derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence })),
+      queryExplanations: derived.queryExplanations,
       rawJobsCollected: rawJobs.length,
       afterQueryFilter: queryFilteredJobs.length,
       afterRoleRelevance: roleRelevantJobs.length,
@@ -650,6 +691,7 @@ export class JobScraperEngine {
       afterApplyDecision: qualifyingJobs.length,
       recommendedJobs: recommendedJobs.length,
       considerJobs: considerJobs.length,
+      qualifyingJobs: qualifyingJobs.length,
       rejectedJobs: rejectedJobs.length,
       finalJobs: returnedJobs.length,
       pipeline,

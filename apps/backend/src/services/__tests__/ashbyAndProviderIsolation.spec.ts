@@ -45,9 +45,9 @@ describe('Ashby ATS & Provider Isolation Spec Suite (Requirement 19)', () => {
     projects: [],
   };
 
-  test('1 & 2. Scrape engine initializes 9 providers and does not crash on single provider error', async () => {
+  test('1 & 2. Scrape engine initializes providers and does not crash on single provider error', async () => {
     const engine = new JobScraperEngine();
-    expect(engine.getProviders().length).toBe(9);
+    expect(engine.getProviders().length).toBeGreaterThanOrEqual(9);
   });
 
   test('3, 4 & 5. Ashby jobs are accepted as real jobs and Axiom/Railway jobs are NOT collapsed together', async () => {

@@ -1,0 +1,262 @@
+{
+  "jobs": [],
+  "matches": [],
+  "masterResume": {
+    "fullName": "Kaushik Khandala",
+    "email": "kaushikkhandalakaushik234@gmail.com",
+    "phone": "+91 8849170743",
+    "location": "Ahmedabad, India",
+    "linkedIn": "https://linkedin.com/in/kaushikkhandala",
+    "github": "https://github.com/kaushikkhandala",
+    "portfolio": "https://kaushikkhandala.dev",
+    "summary": "Flutter Developer (3.8 Years) with proven expertise building high-performance cross-platform iOS and Android mobile applications using Flutter, Dart, SQLite, and Hive.",
+    "explicitExperienceYears": 3.8,
+    "experienceSource": "RESUME_EXPLICIT",
+    "skills": {
+      "languages": [
+        "Dart"
+      ],
+      "frameworks": [
+        "Flutter",
+        "BLoC"
+      ],
+      "cloudAndDevOps": [
+        "Firebase"
+      ],
+      "databases": [
+        "SQLite",
+        "Hive"
+      ],
+      "tools": [
+        "Git",
+        "Android Studio",
+        "VSCode"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Safal Infosoft",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "12/2023",
+        "endDate": "Present",
+        "highlights": [
+          "Built cross-platform Flutter applications using BLoC state management and Firebase backend integrations.",
+          "Engineered offline caching layer using SQLite and Hive local key-value databases."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite",
+          "Hive",
+          "Firebase"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Flutter Developer",
+        "location": "Ahmedabad, India",
+        "startDate": "01/2023",
+        "endDate": "11/2023",
+        "highlights": [
+          "Developed mobile feature modules for iOS and Android using Flutter & Dart.",
+          "Integrated RESTful API endpoints and state management."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "REST APIs",
+          "Git"
+        ]
+      },
+      {
+        "company": "Potenz Technology",
+        "role": "Operations Manager",
+        "location": "Ahmedabad, India",
+        "startDate": "07/2022",
+        "endDate": "01/2023",
+        "highlights": [
+          "Managed tech team operations and contributed to Flutter application development."
+        ],
+        "technologiesUsed": [
+          "Flutter",
+          "Dart",
+          "Operations"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "institution": "Sal Engineering & Technical Institute",
+        "degree": "B.E",
+        "fieldOfStudy": "Information Technology",
+        "graduationYear": "2022"
+      }
+    ],
+    "certifications": [],
+    "projects": [
+      {
+        "title": "Urmin Food and Tobacco distribution application",
+        "description": "Order processing speed improved by 35%, real-time inventory tracking, stock discrepancies reduced by 25%, coordinated a team of 6 developers, payment transaction success rate of 98%.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "BLoC",
+          "SQLite"
+        ],
+        "url": "https://github.com/kaushikkhandala/urmin-food"
+      },
+      {
+        "title": "Danatone ERP",
+        "description": "Operational efficiency improved by 35%, 25% faster decision-making, 10+ core modules, database latency reduced by 40%, manual errors reduced by 50%, coordinated a team of 6 developers.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Hive",
+          "REST APIs"
+        ],
+        "url": "https://github.com/kaushikkhandala/danatone-erp"
+      },
+      {
+        "title": "Tent Studio",
+        "description": "User engagement improved by 30%, load times reduced by 40%, 15+ updates, analytics, 25% improvement in data-driven decision-making.",
+        "technologies": [
+          "Flutter",
+          "Dart",
+          "Firebase"
+        ],
+        "url": "https://github.com/kaushikkhandala/tent-studio"
+      }
+    ]
+  },
+  "tailoredResumes": [],
+  "resumeVersions": [],
+  "coverLetters": [
+    {
+      "id": "cl_1787051725512_8uql1",
+      "jobId": "job_stripe_01",
+      "companyName": "Stripe",
+      "jobTitle": "Staff Backend Engineer",
+      "salutation": "Dear Stripe Hiring Committee,",
+      "contentParagraphs": [
+        "I am writing to express my enthusiastic interest in the Staff Backend Engineer position at Stripe. With a proven background in engineering high-throughput, resilient software systems, I am confident in my ability to deliver immediate value to Stripe's engineering team.",
+        "Throughout my career, my relevant experience includes serving as Senior Engineer at Atlassian (2021 - Present). In this role, I led full-lifecycle backend and frontend initiatives, optimizing response latencies and automating infrastructure deployments. My experience as a Lead Systems Developer further solidified my capability in architecting mission-critical platforms.",
+        "My core technology stack directly aligns with your requirements, prominently featuring TypeScript, Node.js, PostgreSQL, Docker, AWS. I thrive in high-velocity environments where engineering excellence, clean code standards, and robust continuous integration drive product outcomes.",
+        "Thank you for reviewing my application for the Staff Backend Engineer role. I look forward to the opportunity to discuss how my technical expertise and passion for building scalable solutions will benefit Stripe."
+      ],
+      "closing": "Sincerely,",
+      "pdfStoragePath": "/cover_letters/stripe_letter.pdf",
+      "generatedAt": "2026-08-18T11:15:25.514Z"
+    }
+  ],
+  "coverLetterVersions": [
+    {
+      "id": "cl_ver_1787051733265_5scuv",
+      "versionTag": "v1.0",
+      "jobId": "job_stripe_01",
+      "jobTitle": "Staff Backend Engineer",
+      "companyName": "Stripe",
+      "salutation": "Dear Stripe Hiring Committee,",
+      "relevantExperienceMentioned": [
+        "Senior Engineer at Atlassian (2021 - Present)"
+      ],
+      "techStackMentioned": [
+        "TypeScript",
+        "Node.js",
+        "PostgreSQL",
+        "Docker",
+        "AWS"
+      ],
+      "contentParagraphs": [
+        "I am writing to express my enthusiastic interest in the Staff Backend Engineer position at Stripe. With a proven background in engineering high-throughput, resilient software systems, I am confident in my ability to deliver immediate value to Stripe's engineering team.",
+        "Throughout my career, my relevant experience includes serving as Senior Engineer at Atlassian (2021 - Present). In this role, I led full-lifecycle backend and frontend initiatives, optimizing response latencies and automating infrastructure deployments. My experience as a Lead Systems Developer further solidified my capability in architecting mission-critical platforms.",
+        "My core technology stack directly aligns with your requirements, prominently featuring TypeScript, Node.js, PostgreSQL, Docker, AWS. I thrive in high-velocity environments where engineering excellence, clean code standards, and robust continuous integration drive product outcomes.",
+        "Thank you for reviewing my application for the Staff Backend Engineer role. I look forward to the opportunity to discuss how my technical expertise and passion for building scalable solutions will benefit Stripe."
+      ],
+      "closing": "Sincerely,",
+      "formats": {
+        "pdfDataUrl": "data:application/pdf;base64,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",
+        "docxBase64": "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",
+        "jsonRepresentation": {
+          "masterCandidate": {
+            "fullName": "Kaushik Khandala",
+            "email": "kaushikkhandalakaushik234@gmail.com",
+            "phone": "+91 8849170743"
+          },
+          "coverLetter": {
+            "id": "cl_1787051725512_8uql1",
+            "jobId": "job_stripe_01",
+            "companyName": "Stripe",
+            "jobTitle": "Staff Backend Engineer",
+            "salutation": "Dear Stripe Hiring Committee,",
+            "contentParagraphs": [
+              "I am writing to express my enthusiastic interest in the Staff Backend Engineer position at Stripe. With a proven background in engineering high-throughput, resilient software systems, I am confident in my ability to deliver immediate value to Stripe's engineering team.",
+              "Throughout my career, my relevant experience includes serving as Senior Engineer at Atlassian (2021 - Present). In this role, I led full-lifecycle backend and frontend initiatives, optimizing response latencies and automating infrastructure deployments. My experience as a Lead Systems Developer further solidified my capability in architecting mission-critical platforms.",
+              "My core technology stack directly aligns with your requirements, prominently featuring TypeScript, Node.js, PostgreSQL, Docker, AWS. I thrive in high-velocity environments where engineering excellence, clean code standards, and robust continuous integration drive product outcomes.",
+              "Thank you for reviewing my application for the Staff Backend Engineer role. I look forward to the opportunity to discuss how my technical expertise and passion for building scalable solutions will benefit Stripe."
+            ],
+            "closing": "Sincerely,",
+            "pdfStoragePath": "/cover_letters/stripe_letter.pdf",
+            "generatedAt": "2026-08-18T11:15:25.514Z"
+          },
+          "mentions": {
+            "companyName": "Stripe",
+            "jobTitle": "Staff Backend Engineer",
+            "relevantExperience": [
+              "Senior Engineer at Atlassian (2021 - Present)"
+            ],
+            "techStack": [
+              "TypeScript",
+              "Node.js",
+              "PostgreSQL",
+              "Docker",
+              "AWS"
+            ]
+          },
+          "meta": {
+            "generatedAt": "2026-08-18T11:15:33.259Z"
+          }
+        }
+      },
+      "createdAt": "2026-08-18T11:15:33.265Z"
+    }
+  ],
+  "applications": [],
+  "emails": [],
+  "settings": {
+    "countryFilter": [
+      "AU",
+      "CA",
+      "DE"
+    ],
+    "minimumSalary": 110000,
+    "remoteOnly": false,
+    "visaRequired": true,
+    "targetKeywords": [
+      "Software Engineer",
+      "Full Stack Engineer",
+      "Backend Engineer",
+      "TypeScript",
+      "Node.js"
+    ],
+    "blacklistedCompanies": [
+      "ScamCorp",
+      "Unpaid Internships Inc"
+    ],
+    "whitelistedCompanies": [
+      "Atlassian",
+      "Canva",
+      "Shopify",
+      "SAP",
+      "Zendesk",
+      "Amazon",
+      "Google"
+    ],
+    "dailyApplicationLimit": 10,
+    "automationMode": "MANUAL_APPROVAL",
+    "schedulerFrequencyHours": 24,
+    "enableEmailMonitor": true
+  },
+  "searchHistory": []
+}

@@ -350,6 +350,19 @@ export class JobVerificationService {
 
       if (missingTechGroups.length === 0) {
         const isTitleMatch = requestedTechs.some((t) => titleToUse.includes(t));
+        if (!isTitleMatch) {
+          const conflictingTechs = ['ios', 'android', 'backend', 'java', 'python', 'c++', 'rust', 'go', 'golang'].filter(
+            (t) => !requestedTechs.includes(t) && (titleToUse.includes(t) || titleToUse.includes(`(${t})`))
+          );
+          if (conflictingTechs.length > 0) {
+            return {
+              searchRelevanceVerified: false,
+              searchRelevanceScore: 0.15,
+              searchRelevanceReason: `Target search query technology (${requestedTechs.join(', ')}) missing from verified job title (${verifiedTitle || job.title}).`,
+              searchQuery: rawQuery,
+            };
+          }
+        }
         return {
           searchRelevanceVerified: true,
           searchRelevanceScore: isTitleMatch ? 1.0 : 0.85,

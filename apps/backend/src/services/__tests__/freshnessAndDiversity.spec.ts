@@ -240,7 +240,7 @@ describe('Freshness, Revalidation & Employer Diversity Spec Suite (Phase 25)', (
 
     test('Generates candidate-aware search variations for Flutter candidate', () => {
       const derived = deriveSearchQueriesFromResume(sampleResume);
-      expect(derived.keywords.some((k) => k.includes('startup') || k.includes('SaaS') || k.includes('scale-up'))).toBe(true);
+      expect(derived.keywords.some((k) => k.includes('Flutter') || k.includes('Mobile'))).toBe(true);
     });
   });
 

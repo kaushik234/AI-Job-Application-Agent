@@ -27,6 +27,7 @@ export class AshbyProvider extends BaseJobProvider {
 
       logger.info('SEARCH', `[JOB_SOURCE] Provider: Ashby | Query: ${query.keywords?.join(', ') || 'All'} | Started`);
 
+      let boardsRateLimited = 0;
       const batchRes = await this.fetchBatchedBoards(
         ASHBY_BOARDS,
         async (boardToken) => {
@@ -34,6 +35,10 @@ export class AshbyProvider extends BaseJobProvider {
             headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
           });
 
+          if (res.status === 429) {
+            boardsRateLimited++;
+            return null;
+          }
           if (!res.ok) return null;
           const data = await res.json();
           if (data && Array.isArray(data.jobs)) {
@@ -92,7 +97,10 @@ export class AshbyProvider extends BaseJobProvider {
       let message: string | undefined;
 
       if (boardsAttempted > 0 && boardsSucceeded === 0) {
-        if (boardsTimedOut > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Ashby boards rate limited (HTTP 429)`;
+        } else if (boardsTimedOut > 0) {
           outcomeStatus = 'TIMEOUT';
           message = `All ${boardsAttempted} Ashby board requests timed out`;
         } else {
@@ -100,7 +108,10 @@ export class AshbyProvider extends BaseJobProvider {
           message = `All ${boardsAttempted} Ashby board requests failed`;
         }
       } else if (rawJobsAfterQueryFilter === 0) {
-        if (boardsFailed > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Ashby boards rate limited (HTTP 429)`;
+        } else if (boardsFailed > 0) {
           outcomeStatus = 'PARTIAL_RESULTS';
           message = `${boardsFailed}/${boardsAttempted} Ashby boards failed to respond`;
         } else {
@@ -116,6 +127,7 @@ export class AshbyProvider extends BaseJobProvider {
         boardsSucceeded,
         boardsFailed,
         boardsTimedOut,
+        boardsRateLimited,
         rawJobsBeforeQueryFilter,
         rawJobsAfterQueryFilter,
         message,

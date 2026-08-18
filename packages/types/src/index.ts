@@ -416,6 +416,7 @@ export interface JobListing {
   matchScore?: number;
   applicationPriority?: PriorityLevel | number;
   recommendation?: RecommendationLevel | string;
+  applicationDecision?: 'APPLY' | 'CONSIDER' | 'DO_NOT_APPLY' | 'REJECTED' | string;
   visaStatus?: VisaStatus;
   ranking?: JobRankingResult;
   evaluation?: JobEvaluationResult;

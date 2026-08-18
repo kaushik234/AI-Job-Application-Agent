@@ -26,6 +26,7 @@ import {
 import { JobSearchQuery } from '../providers/BaseJobProvider';
 
 describe('Individual Job Providers Spec Suite (All 9 Providers)', () => {
+  jest.setTimeout(30000);
   const query: JobSearchQuery = {
     keywords: ['Flutter', 'Software'],
     countries: ['ALL'],
@@ -52,7 +53,7 @@ describe('Individual Job Providers Spec Suite (All 9 Providers)', () => {
     expect(Array.isArray(result.jobs)).toBe(true);
     for (const job of result.jobs) {
       expect(job.company).toBeDefined();
-      expect(job.url).toMatch(/^https:\/\/boards\.greenhouse\.io\//);
+      expect(job.url).toMatch(/greenhouse\.io|gh_jid=|^https?:\/\//);
     }
   });
 

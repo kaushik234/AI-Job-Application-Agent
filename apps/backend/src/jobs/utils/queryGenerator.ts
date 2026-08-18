@@ -5,6 +5,13 @@
 
 import { MasterResume } from '@sentinel/types';
 
+export interface QueryGenerationExplanation {
+  query: string;
+  source: 'candidate_role_profile' | 'primary_tech_stack' | 'role_family' | 'custom_user_query';
+  evidence: string[];
+  confidence: number;
+}
+
 export interface DerivedJobQueries {
   userQuery?: string;
   primaryQueries: string[];
@@ -13,6 +20,11 @@ export interface DerivedJobQueries {
   primaryRole: string;
   seniorityLevel: 'Junior' | 'Mid' | 'Senior' | 'Lead';
   totalYearsExperience: number;
+  targetRoles: string[];
+  roleFamilies: string[];
+  primaryTechnologies: string[];
+  supportingTechnologies: string[];
+  queryExplanations: QueryGenerationExplanation[];
 }
 
 /**
@@ -90,6 +102,11 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
       primaryRole: 'None',
       seniorityLevel: 'Mid',
       totalYearsExperience: 0,
+      targetRoles: [],
+      roleFamilies: [],
+      primaryTechnologies: [],
+      supportingTechnologies: [],
+      queryExplanations: [],
     };
   }
 
@@ -122,22 +139,36 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
       generatedQueriesSet.add(rClean.replace(/engineer/i, 'Developer'));
     }
 
+    // Add base role without Senior/Lead/Junior prefix
+    const baseRole = rClean.replace(/^(senior|lead|junior|principal|staff|associate)\s+/i, '').trim();
+    if (baseRole && baseRole !== rClean) {
+      generatedQueriesSet.add(baseRole);
+      if (baseRole.toLowerCase().includes('developer')) {
+        generatedQueriesSet.add(baseRole.replace(/developer/i, 'Engineer'));
+      } else if (baseRole.toLowerCase().includes('engineer')) {
+        generatedQueriesSet.add(baseRole.replace(/engineer/i, 'Developer'));
+      }
+    }
+
     // Add Senior / Lead prefix if supported
     if ((seniorityLevel === 'Senior' || seniorityLevel === 'Lead') && !rLower.startsWith('senior') && !rLower.startsWith('lead')) {
       generatedQueriesSet.add(`Senior ${rClean}`);
+      if (baseRole) {
+        generatedQueriesSet.add(`Senior ${baseRole}`);
+      }
     }
   }
 
   // B. Core Technology + Relevant Role Permutations
-  // Restrict to major programming languages & primary frameworks (do not turn tooling like Git/VSCode/SQLite into roles)
+  // Restrict strictly to primary frameworks & major languages.
+  // Supporting technologies (Git, SQLite, BLoC, Firebase, VS Code, SQL, Dart, etc.) MUST NOT become job titles!
   const QUERY_ELIGIBLE_TECHS = new Set([
-    'flutter', 'dart', 'react native', 'android', 'ios', 'kotlin', 'swift',
-    'react', 'next.js', 'vue', 'angular', 'node', 'node.js', 'nodejs', 'python', 'django',
-    'fastapi', 'java', 'spring', 'golang', 'go', 'ruby', 'rails', 'c#', '.net', 'cpp', 'c++',
-    'spark', 'snowflake', 'sql'
+    'flutter', 'react native', 'react', 'next.js', 'vue', 'angular', 'node', 'node.js', 'nodejs',
+    'python', 'django', 'fastapi', 'java', 'spring', 'golang', 'go', 'ruby', 'rails', 'c#', '.net', 'cpp', 'c++',
+    'spark', 'snowflake', 'kotlin', 'swift'
   ]);
 
-  for (const tech of profile.coreTechnologies) {
+  for (const tech of profile.primaryTechnologies) {
     const tClean = tech.trim();
     if (tClean.length < 2) continue;
 
@@ -219,6 +250,51 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     effectiveKeywords = [...resumeQueries];
   }
 
+  const queryExplanations: QueryGenerationExplanation[] = [];
+
+  if (userQueryClean) {
+    queryExplanations.push({
+      query: userQueryClean,
+      source: 'custom_user_query',
+      evidence: [`Explicit user input search term "${userQueryClean}"`],
+      confidence: 1.0,
+    });
+  }
+
+  for (const q of generatedQueries) {
+    let source: QueryGenerationExplanation['source'] = 'role_family';
+    let confidence = 0.88;
+    const evidence: string[] = [];
+
+    const matchedRole = profile.primaryRoles.find((r) => q.toLowerCase().includes(r.toLowerCase()));
+    const matchedTech = profile.primaryTechnologies.find((t) => q.toLowerCase().includes(t.toLowerCase()));
+
+    if (matchedRole && matchedTech) {
+      source = 'candidate_role_profile';
+      confidence = 0.95;
+      evidence.push(`Technology "${matchedTech}" appears in primary skills`, `Candidate experience includes role "${matchedRole}"`);
+    } else if (matchedRole) {
+      source = 'candidate_role_profile';
+      confidence = 0.94;
+      evidence.push(`Candidate experience includes role "${matchedRole}"`);
+    } else if (matchedTech) {
+      source = 'primary_tech_stack';
+      confidence = 0.92;
+      evidence.push(`Technology "${matchedTech}" appears in primary skill stack`, `Inferred role family [${profile.roleFamilies[0] || 'engineering'}]`);
+    } else {
+      source = 'role_family';
+      confidence = 0.88;
+      evidence.push(`Role family taxonomy expansion for [${profile.roleFamilies.join(', ')}]`);
+    }
+
+    queryExplanations.push({
+      query: q,
+      source,
+      evidence,
+      confidence,
+    });
+  }
+
   return {
     userQuery: userQueryClean,
     primaryQueries,
@@ -227,6 +303,11 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     primaryRole: profile.primaryRoles[0] || (generatedQueries[0] ?? 'Software Engineer'),
     seniorityLevel,
     totalYearsExperience,
+    targetRoles: profile.primaryRoles,
+    roleFamilies: profile.roleFamilies,
+    primaryTechnologies: profile.primaryTechnologies,
+    supportingTechnologies: profile.supportingTechnologies,
+    queryExplanations,
   };
 }
 
