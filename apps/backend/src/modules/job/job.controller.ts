@@ -70,4 +70,10 @@ export class JobController {
   async auditDocument(@Param('id') id: string) {
     return this.jobService.getAuditDocument(id);
   }
+
+  @Post(':id/save')
+  @ApiOperation({ summary: 'Explicitly save a transient discovered job to persistent database' })
+  async saveJob(@Param('id') id: string) {
+    return this.jobService.explicitlySaveJob(id);
+  }
 }

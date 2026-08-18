@@ -6,6 +6,7 @@
 
 import { db, DatabaseManager } from '../database';
 import { JobListing, JobMatchResult, CountryCode } from '@sentinel/types';
+import { discoveryJobStore } from '../services/DiscoveryJobStore';
 
 export class JobRepository {
   private database: DatabaseManager;
@@ -87,9 +88,13 @@ export class JobRepository {
   }
 
   /**
-   * Retrieves single job by ID
+   * Retrieves single job by ID (checks transient discovery store first, falls back to database)
    */
   public async findById(id: string): Promise<JobListing | null> {
+    const transient = discoveryJobStore.getJob(id);
+    if (transient) {
+      return transient;
+    }
     return this.database.getJobById(id);
   }
 

@@ -16,6 +16,7 @@ import { formatCandidateExperienceYears } from '../utils/experienceFormatter';
 import { contentFabricationAuditor } from './ContentFabricationAuditor';
 import { logger } from '@sentinel/shared';
 import crypto from 'crypto';
+import { discoveryJobStore } from './DiscoveryJobStore';
 
 export class CoverLetterService {
   /**
@@ -25,7 +26,7 @@ export class CoverLetterService {
     jobId: string,
     resumeVersionId?: string
   ): Promise<{ coverLetter: CoverLetter; version: number }> {
-    const job = await db.getJobById(jobId);
+    const job = discoveryJobStore.getJob(jobId) || (await db.getJobById(jobId));
     if (!job) {
       throw new Error(`Job listing not found for ID: ${jobId}`);
     }

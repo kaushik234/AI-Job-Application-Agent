@@ -15,6 +15,7 @@ import {
 } from '@sentinel/types';
 import { db } from '../database';
 import { jobRankingService } from './JobRankingService';
+import { discoveryJobStore } from './DiscoveryJobStore';
 import { logger } from '@sentinel/shared';
 import crypto from 'crypto';
 
@@ -67,11 +68,11 @@ export class ApplicationPreparationService {
    * Enforces strict cross-job document ownership and data currentness.
    */
   public async getReadiness(jobIdOrAppId: string): Promise<ApplicationReadinessResult> {
-    let job = await db.getJobById(jobIdOrAppId);
+    let job = discoveryJobStore.getJob(jobIdOrAppId) || (await db.getJobById(jobIdOrAppId));
     if (!job) {
       const app = await db.getApplicationByJobId(jobIdOrAppId);
       if (app) {
-        job = await db.getJobById(app.jobId);
+        job = discoveryJobStore.getJob(app.jobId) || (await db.getJobById(app.jobId));
       }
     }
 

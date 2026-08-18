@@ -17,6 +17,7 @@ import { db } from '../database';
 import { aiService } from './AIService';
 import { contentFabricationAuditor } from './ContentFabricationAuditor';
 import { logger } from '@sentinel/shared';
+import { discoveryJobStore } from './DiscoveryJobStore';
 import crypto from 'crypto';
 
 export class TailoredResumeService {
@@ -27,7 +28,7 @@ export class TailoredResumeService {
   public async generateTailoredResume(
     jobId: string
   ): Promise<{ tailoredResume: TailoredResume; structured: StructuredTailoredResume; version: number }> {
-    const job = await db.getJobById(jobId);
+    const job = discoveryJobStore.getJob(jobId) || (await db.getJobById(jobId));
     if (!job) {
       throw new Error(`Job listing not found with ID: ${jobId}`);
     }

@@ -5,7 +5,7 @@ import { JobRepository } from '../../repositories/JobRepository';
 import { jobEvaluationService } from '../../services/JobEvaluationService';
 import { jobRankingService } from '../../services/JobRankingService';
 import { db } from '../../database';
-import { CountryCode } from '@sentinel/types';
+import { CountryCode, JobListing } from '@sentinel/types';
 
 @Injectable()
 export class JobService {
@@ -371,6 +371,19 @@ export class JobService {
         fabricationCheck: 'PASS',
         evaluatedAt: new Date().toISOString(),
       },
+    };
+  }
+
+  async explicitlySaveJob(jobId: string): Promise<{ success: boolean; job: JobListing }> {
+    const { discoveryJobStore } = require('../../services/DiscoveryJobStore');
+    const job = discoveryJobStore.getJob(jobId) || (await this.jobRepo.findById(jobId));
+    if (!job) {
+      throw new NotFoundException(`Job not found with ID: ${jobId}`);
+    }
+    await db.saveJobs([job]);
+    return {
+      success: true,
+      job,
     };
   }
 }

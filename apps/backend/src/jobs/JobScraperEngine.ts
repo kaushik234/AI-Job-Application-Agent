@@ -6,6 +6,7 @@
 
 import { JobListing, CountryCode, JobPlatform, MasterResume } from '@sentinel/types';
 import { JobRepository } from '../repositories/JobRepository';
+import { discoveryJobStore } from '../services/DiscoveryJobStore';
 import {
   BaseJobProvider,
   JobSearchQuery,
@@ -40,6 +41,7 @@ import { jobDeduplicationService } from '../services/JobDeduplicationService';
 export interface SearchEngineCrawlReport {
   mode: 'WORLDWIDE' | 'CUSTOM';
   totalScrapedRaw: number;
+  freshJobsReturned?: number;
   totalUniqueNew: number;
   duplicatesFiltered: number;
   providersProcessed: number;
@@ -463,9 +465,10 @@ export class JobScraperEngine {
 
     console.log('[DISCOVERY_DEBUG_SUMMARY]', JSON.stringify(debug, null, 2));
 
-    // 10. Persist only verified active jobs
+    // 10. Store verified active jobs in Transient Discovery Store (NO database write)
+    const discoveryRunId = `disc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     if (scoredRawJobs.length > 0) {
-      await this.jobRepo.saveMany(scoredRawJobs);
+      discoveryJobStore.saveJobs(scoredRawJobs, discoveryRunId);
     }
 
     // 8. Top 50 jobs ordered by priority and matchScore
@@ -475,12 +478,12 @@ export class JobScraperEngine {
     logger.info('SEARCH', `[ROLE_RELEVANCE] relevant=${roleRelevantJobs.length}/${deduplicated.length}`);
     logger.info('SEARCH', `[VERIFICATION] active=${verifiedActiveJobs.length}/${countryFilteredJobs.length}`);
     logger.info('SEARCH', `[RANKING] scored=${scoredRawJobs.length}`);
-    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length}`);
+    logger.info('SEARCH', `[SCRAPE_COMPLETE] returned=${top50Jobs.length} (Transient stored, 0 DB writes)`);
 
     logger.success('SEARCH', 'Completed parallel job crawl & candidate resume matching', {
       mode,
       rawScraped: rawJobs.length,
-      newUniqueSaved: scoredRawJobs.length,
+      freshJobsReturned: scoredRawJobs.length,
       duplicatesFiltered: duplicatesRemovedCount,
       freshScrapeCount: top50Jobs.length,
     });
@@ -488,6 +491,7 @@ export class JobScraperEngine {
     return {
       mode,
       totalScrapedRaw: rawJobs.length,
+      freshJobsReturned: scoredRawJobs.length,
       totalUniqueNew: scoredRawJobs.length,
       duplicatesFiltered: duplicatesRemovedCount,
       providersProcessed: this.providers.length,
