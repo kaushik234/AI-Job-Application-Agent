@@ -173,12 +173,14 @@ export abstract class BaseJobProvider implements JobDiscoveryProvider {
     boardsSucceeded: number;
     boardsFailed: number;
     boardsTimedOut: number;
+    boardsRateLimited: number;
   }> {
     const items: T[] = [];
     const boardsAttempted = boardTokens.length;
     let boardsSucceeded = 0;
     let boardsFailed = 0;
     let boardsTimedOut = 0;
+    let boardsRateLimited = 0;
 
     for (let i = 0; i < boardTokens.length; i += batchSize) {
       const chunk = boardTokens.slice(i, i + batchSize);
@@ -206,7 +208,9 @@ export abstract class BaseJobProvider implements JobDiscoveryProvider {
         } else {
           boardsFailed++;
           const reason = res.status === 'rejected' ? String(res.reason?.message || res.reason) : '';
-          if (reason.toLowerCase().includes('timeout') || reason.toLowerCase().includes('abort')) {
+          if (reason.includes('429') || reason.toLowerCase().includes('rate limit')) {
+            boardsRateLimited++;
+          } else if (reason.toLowerCase().includes('timeout') || reason.toLowerCase().includes('abort')) {
             boardsTimedOut++;
           }
         }
@@ -219,6 +223,7 @@ export abstract class BaseJobProvider implements JobDiscoveryProvider {
       boardsSucceeded,
       boardsFailed,
       boardsTimedOut,
+      boardsRateLimited,
     };
   }
 

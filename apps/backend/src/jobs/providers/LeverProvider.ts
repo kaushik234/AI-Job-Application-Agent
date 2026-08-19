@@ -8,64 +8,60 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
 import { normalizePostingDate } from '../utils/dateNormalizer';
+import { jobVerificationService } from '../../services/JobVerificationService';
 
 const LEVER_COMPANIES = [
-  'atlassian', 'netflix', 'shopify', 'spotify', 'palantir', 'uber', 'lyft', 'square',
-  'block', 'reddit', 'pinterest', 'snap', 'discord', 'slack', 'zoom', 'dropbox', 'box',
-  'zendesk', 'hubspot', 'freshworks', 'intercom', 'drift', 'gong', 'chorus', 'salesloft',
-  'outreach', 'apollo'
+  'atlassian', 'netflix', 'spotify', 'shopify', 'palantir', 'yelp', 'eventbrite', 'twitch',
+  'datadog', 'sentry', 'postman', 'figma', 'linear', 'vercel', 'supabase', 'retool',
+  'webflow', 'brex', 'lattice', 'rippling', 'zapier', 'scale', 'character', 'resend',
+  'midjourney', 'cursor', 'replit'
 ];
 
 export class LeverProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Lever';
-  readonly rateLimitMs = 200;
-  readonly maxRetries = 3;
+  readonly rateLimitMs: number = 300;
+  readonly maxRetries: number = 2;
 
-  public async search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
+  public async search(query: JobSearchQuery, pagination: PaginationOptions = {}): Promise<PaginatedJobResults> {
     return this.retry(async () => {
-      const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
-
+      const { offset, limit, page } = this.pagination(pagination.page, pagination.limit);
       logger.info('SEARCH', `[JOB_SOURCE] Provider: Lever | Query: ${query.keywords?.join(', ') || 'All'} | Started`);
 
-      const batchRes = await this.fetchBatchedBoards(
-        LEVER_COMPANIES,
-        async (companyToken) => {
-          const res = await fetch(`https://api.lever.co/v0/postings/${companyToken}?mode=json`, {
-            headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-          });
-
-          if (!res.ok) return null;
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const parsed: JobListing[] = [];
-            for (const item of data) {
-              const normalized = this.normalize(item, companyToken);
-              if (normalized) {
-                parsed.push(normalized);
-              }
+      const { items: allJobs, boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut, boardsRateLimited } =
+        await this.fetchBatchedBoards(
+          LEVER_COMPANIES,
+          async (companyToken) => {
+            const url = `https://api.lever.co/v0/postings/${companyToken}?mode=json`;
+            const resp = await fetch(url, { headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' } });
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            if (Array.isArray(data)) {
+              const parsed: JobListing[] = [];
+              data.forEach((item: any) => {
+                const normalized = this.normalize(item, companyToken);
+                if (normalized) {
+                  parsed.push(normalized);
+                }
+              });
+              return parsed;
             }
-            return parsed;
-          }
-          return null;
-        },
-        6,
-        3500
-      );
+            return null;
+          },
+          8,
+          4000
+        );
 
-      const liveJobs = batchRes.items;
-      const { boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut } = batchRes;
+      const rawJobsBeforeQueryFilter = allJobs.length;
 
-      const rawJobsBeforeQueryFilter = liveJobs.length;
-      let filtered = liveJobs;
-
-      if (!this.isWorldwideQuery(query) && query.countries && query.countries.length > 0) {
-        filtered = filtered.filter((j) => query.countries!.includes(j.country));
-      }
+      let filtered = allJobs;
       if (query.remoteOnly) {
         filtered = filtered.filter((j) => j.isRemote);
       }
       if (query.visaOnly) {
         filtered = filtered.filter((j) => j.visaSponsorship);
+      }
+      if (!this.isWorldwideQuery(query) && query.countries && query.countries.length > 0) {
+        filtered = filtered.filter((j) => query.countries!.includes(j.country));
       }
       if (query.keywords && query.keywords.length > 0) {
         const kwList = query.keywords.map((k) => k.toLowerCase().trim());
@@ -86,7 +82,10 @@ export class LeverProvider extends BaseJobProvider {
       let message: string | undefined;
 
       if (boardsAttempted > 0 && boardsSucceeded === 0) {
-        if (boardsTimedOut > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Lever companies rate limited (HTTP 429)`;
+        } else if (boardsTimedOut > 0) {
           outcomeStatus = 'TIMEOUT';
           message = `All ${boardsAttempted} Lever company requests timed out`;
         } else {
@@ -94,7 +93,10 @@ export class LeverProvider extends BaseJobProvider {
           message = `All ${boardsAttempted} Lever company requests failed`;
         }
       } else if (rawJobsAfterQueryFilter === 0) {
-        if (boardsFailed > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Lever companies rate limited (HTTP 429)`;
+        } else if (boardsFailed > 0) {
           outcomeStatus = 'PARTIAL_RESULTS';
           message = `${boardsFailed}/${boardsAttempted} Lever companies failed to respond`;
         } else {
@@ -110,6 +112,7 @@ export class LeverProvider extends BaseJobProvider {
         boardsSucceeded,
         boardsFailed,
         boardsTimedOut,
+        boardsRateLimited,
         rawJobsBeforeQueryFilter,
         rawJobsAfterQueryFilter,
         message,
@@ -138,25 +141,33 @@ export class LeverProvider extends BaseJobProvider {
     });
   }
 
-  public normalize(raw: any, companyToken: string = 'atlassian'): JobListing {
-    const title = raw.text || raw.title || 'Software Engineer';
-    const company = raw.company || companyToken.charAt(0).toUpperCase() + companyToken.slice(1);
-    const location = raw.categories?.location || raw.location || 'Sydney, Australia';
+  public normalize(raw: any, companyToken: string = 'atlassian'): JobListing | null {
+    if (!raw || typeof raw !== 'object') return null;
 
-    let country: CountryCode = 'AU';
-    const locLower = location.toLowerCase();
-    if (locLower.includes('canada') || locLower.includes(', ca') || locLower.includes('toronto')) {
-      country = 'CA';
-    } else if (locLower.includes('germany') || locLower.includes(', de') || locLower.includes('berlin')) {
-      country = 'DE';
+    const rawId = raw.id;
+    const title = (raw.text || raw.title || '').trim();
+    const company = (raw.company || (companyToken ? companyToken.charAt(0).toUpperCase() + companyToken.slice(1) : '')).trim();
+    const location = (raw.categories?.location || raw.location || '').trim();
+    const jobUrl = raw.hostedUrl || (companyToken && rawId ? `https://jobs.lever.co/${companyToken}/${rawId}` : undefined);
+
+    // Reject job if essential provider fields are missing (Problem 5: ZERO FAKE JOB DATA)
+    if (!rawId || !title || !company || !location || !jobUrl) {
+      return null;
     }
+
+    const canonicalCountry = jobVerificationService.deriveCanonicalCountry(location, 'UNKNOWN');
+    const country = canonicalCountry.country as CountryCode;
 
     const desc = raw.descriptionPlain || raw.description || '';
     const { isRemote, isHybrid } = this.detectWorkSetup(location, desc);
     const visaSponsorship = this.detectVisaSponsorship(desc);
 
+    const descLower = desc.toLowerCase();
+    const techCandidates = ['flutter', 'react native', 'react', 'node.js', 'typescript', 'javascript', 'python', 'swift', 'kotlin', 'java', 'go', 'graphql', 'sql', 'aws'];
+    const extractedReqs = techCandidates.filter((t) => descLower.includes(t)).map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+
     return {
-      id: `lever-${raw.id || Math.random().toString(36).substring(2, 9)}`,
+      id: `lever-${rawId}`,
       platform: this.platform,
       company,
       title,
@@ -167,9 +178,9 @@ export class LeverProvider extends BaseJobProvider {
       visaSponsorship,
       isRemote,
       isHybrid,
-      url: raw.hostedUrl || `https://jobs.lever.co/${companyToken}/${raw.id || '930129'}`,
+      url: jobUrl,
       description: desc,
-      requirements: ['TypeScript', 'Node.js', 'PostgreSQL'],
+      requirements: Array.isArray(raw.requirements) && raw.requirements.length > 0 ? raw.requirements : extractedReqs,
       postedDate: normalizePostingDate(raw.createdAt) || '',
       postedAt: normalizePostingDate(raw.createdAt),
       createdAt: new Date().toISOString(),

@@ -329,4 +329,42 @@ describe('Pipeline Invariants & Candidate Query Generator Test Suite', () => {
     expect(res1.targetRoles).toEqual(res2.targetRoles);
     expect(res1.keywords).toEqual(res2.keywords);
   });
+
+  test('24. Experience years default to 0 when no resume or experience is available', () => {
+    const { calculateResumeExperienceYears } = require('../utils/queryGenerator');
+    expect(calculateResumeExperienceYears(null)).toBe(0);
+    expect(calculateResumeExperienceYears(undefined)).toBe(0);
+    expect(calculateResumeExperienceYears({ fullName: 'Empty' } as any)).toBe(0);
+  });
+
+  test('25. Provider normalizers return null when essential fields are missing', () => {
+    const { AshbyProvider } = require('../providers/AshbyProvider');
+    const { GreenhouseProvider } = require('../providers/GreenhouseProvider');
+    const { LeverProvider } = require('../providers/LeverProvider');
+    const { WorkableProvider } = require('../providers/WorkableProvider');
+    const { ApifyProvider } = require('../providers/ApifyProvider');
+
+    const ashby = new AshbyProvider();
+    const gh = new GreenhouseProvider();
+    const lever = new LeverProvider();
+    const wk = new WorkableProvider();
+    const apify = new ApifyProvider();
+
+    // Invalid missing fields return null
+    expect(ashby.normalize({})).toBeNull();
+    expect(gh.normalize({})).toBeNull();
+    expect(lever.normalize({})).toBeNull();
+    expect(wk.normalize({})).toBeNull();
+    expect(apify.normalize({})).toBeNull();
+
+    // Missing location returns null
+    expect(ashby.normalize({ id: '123', title: 'Eng', company: 'Co', jobUrl: 'https://ashby.com/123' })).toBeNull();
+    expect(gh.normalize({ id: '123', title: 'Eng', company_name: 'Co', absolute_url: 'https://gh.com/123' })).toBeNull();
+  });
+
+  test('26. Custom user query maintains exact search query and does not substitute resume queries during discovery', () => {
+    const customRes = deriveSearchQueriesFromResume(flutterResume, 'flutter');
+    expect(customRes.userQuery).toBe('flutter');
+    expect(customRes.keywords).toEqual(['flutter']);
+  });
 });

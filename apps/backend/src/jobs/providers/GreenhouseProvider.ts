@@ -8,65 +8,62 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
 import { normalizePostingDate } from '../utils/dateNormalizer';
+import { jobVerificationService } from '../../services/JobVerificationService';
+import axios from 'axios';
 
 const GREENHOUSE_BOARDS = [
-  'canva', 'stripe', 'figma', 'cloudflare', 'doordash', 'airbnb', 'instacart', 'robinhood',
-  'coinbase', 'plaid', 'dbtlabs', 'databricks', 'snowflake', 'confluent', 'hashicorp',
-  'mongodb', 'redis', 'elastic', 'cockroachlabs', 'clickhouse', 'supabase', 'neon',
-  'astronomer', 'prefect', 'dagster', 'airbyte', 'fivetran', 'segment', 'mixpanel',
-  'amplitude', 'posthog'
+  'canva', 'stripe', 'atlassian', 'gitlab', 'cloudflare', 'datadog', 'mongodb', 'hashicorp',
+  'elastic', 'snowflake', 'palantir', 'twilio', 'pagerduty', 'confluent', 'dbtlabs', 'airtable',
+  'notion', 'figma', 'linear', 'vercel', 'supabase', 'retool', 'webflow', 'postman', 'brex',
+  'lattice', 'rippling', 'zapier', 'scale', 'character', 'resend', 'sentry', 'launchdarkly'
 ];
 
 export class GreenhouseProvider extends BaseJobProvider {
   readonly platform: JobPlatform = 'Greenhouse';
-  readonly rateLimitMs = 250;
-  readonly maxRetries = 3;
+  readonly rateLimitMs: number = 300;
+  readonly maxRetries: number = 2;
 
-  public async search(query: JobSearchQuery, pagination?: PaginationOptions): Promise<PaginatedJobResults> {
+  /**
+   * Performs real parallel discovery across target Greenhouse board endpoints
+   */
+  public async search(query: JobSearchQuery, pagination: PaginationOptions = {}): Promise<PaginatedJobResults> {
     return this.retry(async () => {
-      const { page, limit, offset } = this.pagination(pagination?.page, pagination?.limit);
-
+      const { offset, limit, page } = this.pagination(pagination.page, pagination.limit);
       logger.info('SEARCH', `[JOB_SOURCE] Provider: Greenhouse | Query: ${query.keywords?.join(', ') || 'All'} | Started`);
 
-      const batchRes = await this.fetchBatchedBoards(
-        GREENHOUSE_BOARDS,
-        async (boardToken) => {
-          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`, {
-            headers: { 'User-Agent': 'Sentinel-Job-Agent/1.0' },
-          });
-
-          if (!res.ok) return null;
-          const data = await res.json();
-          if (data && Array.isArray(data.jobs)) {
-            const parsed: JobListing[] = [];
-            for (const item of data.jobs) {
-              const normalized = this.normalize(item, boardToken);
-              if (normalized) {
-                parsed.push(normalized);
-              }
+      const { items: allJobs, boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut, boardsRateLimited } =
+        await this.fetchBatchedBoards(
+          GREENHOUSE_BOARDS,
+          async (boardToken) => {
+            const url = `https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`;
+            const resp = await axios.get(url, { timeout: 4000 });
+            if (resp.status === 200 && Array.isArray(resp.data?.jobs)) {
+              const parsed: JobListing[] = [];
+              resp.data.jobs.forEach((item: any) => {
+                const normalized = this.normalize(item, boardToken);
+                if (normalized) {
+                  parsed.push(normalized);
+                }
+              });
+              return parsed;
             }
-            return parsed;
-          }
-          return null;
-        },
-        6,
-        3500
-      );
+            return null;
+          },
+          8,
+          4000
+        );
 
-      const liveJobs = batchRes.items;
-      const { boardsAttempted, boardsSucceeded, boardsFailed, boardsTimedOut } = batchRes;
+      const rawJobsBeforeQueryFilter = allJobs.length;
 
-      const rawJobsBeforeQueryFilter = liveJobs.length;
-      let filtered = liveJobs;
-
-      if (!this.isWorldwideQuery(query) && query.countries && query.countries.length > 0) {
-        filtered = filtered.filter((j) => query.countries!.includes(j.country));
-      }
+      let filtered = allJobs;
       if (query.remoteOnly) {
         filtered = filtered.filter((j) => j.isRemote);
       }
       if (query.visaOnly) {
         filtered = filtered.filter((j) => j.visaSponsorship);
+      }
+      if (query.countries && query.countries.length > 0) {
+        filtered = filtered.filter((j) => query.countries!.includes(j.country));
       }
       if (query.keywords && query.keywords.length > 0) {
         const kwList = query.keywords.map((k) => k.toLowerCase().trim());
@@ -87,7 +84,10 @@ export class GreenhouseProvider extends BaseJobProvider {
       let message: string | undefined;
 
       if (boardsAttempted > 0 && boardsSucceeded === 0) {
-        if (boardsTimedOut > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Greenhouse boards rate limited (HTTP 429)`;
+        } else if (boardsTimedOut > 0) {
           outcomeStatus = 'TIMEOUT';
           message = `All ${boardsAttempted} Greenhouse board requests timed out`;
         } else {
@@ -95,7 +95,10 @@ export class GreenhouseProvider extends BaseJobProvider {
           message = `All ${boardsAttempted} Greenhouse board requests failed`;
         }
       } else if (rawJobsAfterQueryFilter === 0) {
-        if (boardsFailed > 0) {
+        if (boardsRateLimited > 0) {
+          outcomeStatus = 'RATE_LIMITED';
+          message = `${boardsRateLimited}/${boardsAttempted} Greenhouse boards rate limited (HTTP 429)`;
+        } else if (boardsFailed > 0) {
           outcomeStatus = 'PARTIAL_RESULTS';
           message = `${boardsFailed}/${boardsAttempted} Greenhouse boards failed to respond`;
         } else {
@@ -111,6 +114,7 @@ export class GreenhouseProvider extends BaseJobProvider {
         boardsSucceeded,
         boardsFailed,
         boardsTimedOut,
+        boardsRateLimited,
         rawJobsBeforeQueryFilter,
         rawJobsAfterQueryFilter,
         message,
@@ -139,25 +143,33 @@ export class GreenhouseProvider extends BaseJobProvider {
     });
   }
 
-  public normalize(raw: any, boardToken: string = 'canva'): JobListing {
-    const title = raw.title || raw.job_title || 'Software Engineer';
-    const company = raw.company_name || boardToken.charAt(0).toUpperCase() + boardToken.slice(1);
-    const location = raw.location?.name || raw.location || 'Sydney, Australia';
-    
-    let country: CountryCode = 'AU';
-    const locLower = location.toLowerCase();
-    if (locLower.includes('canada') || locLower.includes(', ca') || locLower.includes('toronto')) {
-      country = 'CA';
-    } else if (locLower.includes('germany') || locLower.includes(', de') || locLower.includes('berlin')) {
-      country = 'DE';
+  public normalize(raw: any, boardToken: string = 'canva'): JobListing | null {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const rawId = raw.id;
+    const title = (raw.title || raw.job_title || '').trim();
+    const company = (raw.company_name || (boardToken ? boardToken.charAt(0).toUpperCase() + boardToken.slice(1) : '')).trim();
+    const location = (raw.location?.name || raw.location || '').trim();
+    const jobUrl = raw.absolute_url || (boardToken && rawId ? `https://boards.greenhouse.io/${boardToken}/jobs/${rawId}` : undefined);
+
+    // Reject job if essential provider fields are missing (Problem 5: ZERO FAKE JOB DATA)
+    if (!rawId || !title || !company || !location || !jobUrl) {
+      return null;
     }
+
+    const canonicalCountry = jobVerificationService.deriveCanonicalCountry(location, 'UNKNOWN');
+    const country = canonicalCountry.country as CountryCode;
 
     const desc = raw.content ? raw.content.replace(/<[^>]*>?/gm, '') : raw.description || '';
     const { isRemote, isHybrid } = this.detectWorkSetup(location, desc);
     const visaSponsorship = this.detectVisaSponsorship(desc);
 
+    const descLower = desc.toLowerCase();
+    const techCandidates = ['flutter', 'react native', 'react', 'node.js', 'typescript', 'javascript', 'python', 'swift', 'kotlin', 'java', 'go', 'graphql', 'sql', 'aws'];
+    const extractedReqs = techCandidates.filter((t) => descLower.includes(t)).map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+
     return {
-      id: `gh-${raw.id || Math.random().toString(36).substring(2, 9)}`,
+      id: `gh-${rawId}`,
       platform: this.platform,
       company,
       title,
@@ -168,9 +180,9 @@ export class GreenhouseProvider extends BaseJobProvider {
       visaSponsorship,
       isRemote,
       isHybrid,
-      url: raw.absolute_url || `https://boards.greenhouse.io/${boardToken}/jobs/${raw.id || '4829102'}`,
+      url: jobUrl,
       description: desc,
-      requirements: ['TypeScript', 'Node.js', 'React'],
+      requirements: Array.isArray(raw.requirements) && raw.requirements.length > 0 ? raw.requirements : extractedReqs,
       postedDate: normalizePostingDate(raw.updated_at) || '',
       postedAt: normalizePostingDate(raw.updated_at),
       createdAt: new Date().toISOString(),

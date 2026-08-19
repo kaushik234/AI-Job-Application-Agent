@@ -278,7 +278,7 @@ export class ApplicationPreparationService {
     const tailored = await db.getTailoredResumeByJobId(jobId);
     const coverLetter = await db.getCoverLetterByJobId(jobId);
 
-    const candidateExpYears = master?.explicitExperienceYears || 3.8;
+    const candidateExpYears = master?.explicitExperienceYears || 0;
 
     // 1. SAFE / VERIFIED FIELDS (Autofill allowed, confidence = 1.0)
     const safeFields: AutofillFieldAnalysis[] = [
@@ -287,7 +287,7 @@ export class ApplicationPreparationService {
         fieldSelector: 'input[name*="first" i], input[id*="first" i]',
         fieldType: 'text',
         detectedCategory: 'PERSONAL_INFO',
-        mappedValue: master.fullName.split(' ')[0] || 'Kaushik',
+        mappedValue: master.fullName ? master.fullName.split(' ')[0] : '',
         requiresUserInput: false,
       },
       {
@@ -770,7 +770,7 @@ export class ApplicationPreparationService {
     const jobTitle = job?.title || 'Senior Flutter Developer';
 
     const master = await db.getMasterResume();
-    const candidateExpYears = master?.explicitExperienceYears || 3.8;
+    const candidateExpYears = master?.explicitExperienceYears || 0;
 
     const claims = [
       {

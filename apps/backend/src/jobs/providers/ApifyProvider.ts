@@ -8,6 +8,7 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
 import { normalizePostingDate } from '../utils/dateNormalizer';
+import { jobVerificationService } from '../../services/JobVerificationService';
 import axios from 'axios';
 
 export class ApifyProvider extends BaseJobProvider {
@@ -158,9 +159,9 @@ export class ApifyProvider extends BaseJobProvider {
         message,
         diagnostics: {
           actorId,
-          query: qStr,
-          rawItemsCount: rawItems.length,
-          normalizedCount: validJobs.length,
+          query: query.q || query.userQuery || query.keywords?.join(', '),
+          rawJobsBeforeQueryFilter: rawItems.length,
+          rawJobsAfterQueryFilter: validJobs.length,
           malformedRejectedCount: rejectedCount,
           filteredCount: filtered.length,
         },
@@ -170,18 +171,20 @@ export class ApifyProvider extends BaseJobProvider {
 
   /**
    * Dedicated Apify Item Adapter.
-   * Rejects malformed records missing title, company, or job URL.
+   * Rejects malformed records missing title, company, location, or job URL.
    * Preserves source transparency.
    */
   public normalize(raw: any): JobListing | null {
     if (!raw || typeof raw !== 'object') return null;
 
-    const title = raw.title || raw.jobTitle || raw.positionTitle;
-    const company = raw.company || raw.companyName || raw.employer;
-    const rawUrl = raw.url || raw.jobUrl || raw.link || raw.applyUrl;
+    const title = (raw.title || raw.jobTitle || raw.positionTitle || '').trim();
+    const company = (raw.company || raw.companyName || raw.employer || '').trim();
+    const rawUrl = (raw.url || raw.jobUrl || raw.link || raw.applyUrl || '').trim();
+    const location = (raw.location || raw.locationName || raw.address || '').trim();
+    const sourceJobId = String(raw.id || raw.jobId || '').trim();
 
-    // Strict validation: Reject malformed records without title, company, or valid URL
-    if (!title || !title.trim() || !company || !company.trim() || !rawUrl || !rawUrl.trim()) {
+    // Strict validation: Reject malformed records without title, company, location, ID, or valid URL
+    if (!title || !company || !location || !sourceJobId || !rawUrl) {
       return null;
     }
 
@@ -189,41 +192,33 @@ export class ApifyProvider extends BaseJobProvider {
       return null;
     }
 
-    const location = raw.location || raw.locationName || raw.address || 'Remote / Worldwide';
-    const sourcePlatform = raw.source || raw.platform || raw.origin || 'Apify Scraper';
-    const sourceUrl = raw.sourceUrl || raw.originUrl || rawUrl;
-
-    let country: CountryCode = 'US' as any;
-    const locLower = location.toLowerCase();
-    if (locLower.includes('australia') || locLower.includes('sydney') || locLower.includes('melbourne')) country = 'AU';
-    else if (locLower.includes('canada') || locLower.includes('toronto') || locLower.includes('vancouver')) country = 'CA';
-    else if (locLower.includes('germany') || locLower.includes('berlin') || locLower.includes('munich')) country = 'DE';
+    const sourceUrl = (raw.sourceUrl || raw.originUrl || rawUrl).trim();
+    const canonicalCountry = jobVerificationService.deriveCanonicalCountry(location, 'UNKNOWN');
+    const country = canonicalCountry.country as CountryCode;
 
     const desc = raw.description || raw.descriptionHtml || raw.snippet || '';
     const { isRemote, isHybrid } = this.detectWorkSetup(location, desc);
     const visaSponsorship = this.detectVisaSponsorship(desc);
-
-    const sourceJobId = String(raw.id || raw.jobId || Math.random().toString(36).substring(2, 9));
 
     return {
       id: `apify-${sourceJobId}`,
       internalJobId: `internal-apify-${sourceJobId}`,
       sourceJobId,
       platform: this.platform,
-      company: company.trim(),
-      title: title.trim(),
-      location: location.trim(),
+      company,
+      title,
+      location,
       city: location.split(',')[0] || location,
       country,
       salaryText: raw.salary || raw.compensation || undefined,
       visaSponsorship,
       isRemote,
       isHybrid,
-      url: rawUrl.trim(),
-      originalUrl: sourceUrl.trim(),
-      canonicalUrl: rawUrl.trim(),
+      url: rawUrl,
+      originalUrl: sourceUrl,
+      canonicalUrl: rawUrl,
       description: desc,
-      requirements: Array.isArray(raw.skills) ? raw.skills : ['Software Engineering'],
+      requirements: Array.isArray(raw.skills) && raw.skills.length > 0 ? raw.skills : [],
       postedDate: normalizePostingDate(raw.postedDate || raw.publishedAt || raw.date) || '',
       postedAt: normalizePostingDate(raw.postedDate || raw.publishedAt || raw.date),
       createdAt: new Date().toISOString(),

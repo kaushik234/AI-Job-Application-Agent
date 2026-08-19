@@ -629,15 +629,15 @@ ${extractedText}`;
       logger.info('AI_PROMPT', '[Gemini]\nJSON validation successful');
       logger.info('AI_PROMPT', '[Resume Parser]\nParser used: gemini');
 
-      let explicitExp = 3.8;
+      let explicitExp = 0;
       const scanText = `${extractedText} ${parsed.summary || ''} ${parsed.fullName || ''}`;
-      const match38 = scanText.match(/(?:flutter developer|experience)\s*\(?(\d+\.\d+|\d+)\s*(?:years|yrs)\)?/i) || scanText.match(/(\d+\.\d+)\s*(?:years|yrs)/i);
+      const match38 = scanText.match(/(?:experience)\s*\(?(\d+\.\d+|\d+)\s*(?:years|yrs)\)?/i) || scanText.match(/(\d+\.\d+)\s*(?:years|yrs)/i);
       if (match38 && match38[1]) {
         explicitExp = parseFloat(match38[1]);
       }
 
       const structuredResume: MasterResume = {
-        fullName: parsed.fullName || 'Kaushik Khandala',
+        fullName: parsed.fullName || '',
         email: parsed.email || '',
         phone: parsed.phone || '',
         location: parsed.location || '',

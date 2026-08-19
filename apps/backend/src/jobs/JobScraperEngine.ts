@@ -98,6 +98,11 @@ export interface SearchEngineCrawlReport {
     considerJobs: number;
     rejectedJobs: number;
     returned: number;
+    candidateProfile?: any;
+    generatedQueries?: string[];
+    executedQueries?: string[];
+    queryEvidence?: any[];
+    queryConfidence?: any[];
   };
   debug: {
     queriesGenerated: string[];
@@ -190,9 +195,9 @@ export class JobScraperEngine {
     };
 
     // 3. Structured JOB_SCRAPE diagnostic logs
-    const candidateName = masterResume?.fullName || 'Kaushik Khandala';
+    const candidateName = masterResume?.fullName || undefined;
     const countriesLogStr = isWorldwide ? 'ALL' : query.countries!.join(', ');
-    logger.info('SEARCH', `[SCRAPE_START] candidate=${candidateName}`);
+    logger.info('SEARCH', `[SCRAPE_START] candidate=${candidateName || 'Unspecified'}`);
     logger.info('SEARCH', `[SCRAPE_QUERY] query=${derived.userQuery || 'All'} countries=${countriesLogStr} visaOnly=${visaOnly} remoteOnly=${remoteOnly}`);
 
     const providerBreakdown: Record<string, { scraped: number; status: string; message?: string; diagnostics?: Record<string, any> }> = {};
@@ -201,9 +206,12 @@ export class JobScraperEngine {
     const targetCollectionLimit = pagination.targetLimit || 150;
     const maxPagesSafetyLimit = pagination.maxPages || 10;
 
-    const activeSubQueries = derived.userQuery
-      ? [derived.userQuery]
-      : (derived.keywords || []);
+    // Determine executed queries (Problem 6 & Problem 11: Bounded execution strategy)
+    const executedQueryExplanations = derived.userQuery
+      ? derived.queryExplanations.filter((e) => e.source === 'custom_user_query')
+      : derived.queryExplanations.slice(0, 5);
+
+    const activeSubQueries = executedQueryExplanations.map((e) => e.query);
 
     if (activeSubQueries.length === 0) {
       logger.warn('SEARCH', '[SCRAPE_ABORTED] No candidate resume or keywords available to derive target discovery queries.');
@@ -235,6 +243,18 @@ export class JobScraperEngine {
           considerJobs: 0,
           rejectedJobs: 0,
           returned: 0,
+          candidateProfile: {
+            primaryRoles: derived.targetRoles,
+            roleFamilies: derived.roleFamilies,
+            primaryTechnologies: derived.primaryTechnologies,
+            supportingTechnologies: derived.supportingTechnologies,
+            seniority: derived.seniorityLevel,
+            experienceYears: derived.totalYearsExperience,
+          },
+          generatedQueries: derived.queryExplanations.map((e) => e.query),
+          executedQueries: activeSubQueries,
+          queryEvidence: derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence })),
+          queryConfidence: derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence })),
         },
         debug: {
           queriesGenerated: [],
@@ -665,20 +685,30 @@ export class JobScraperEngine {
       verifiedActive: verifiedActiveJobs.length,
       recommended: recommendedJobs.length,
       consider: considerJobs.length,
-      qualifying: qualifyingJobs.length,
       rejected: rejectedJobs.length,
       recommendedJobs: recommendedJobs.length,
       considerJobs: considerJobs.length,
       rejectedJobs: rejectedJobs.length,
       returned: returnedJobs.length,
+      candidateProfile: {
+        primaryRoles: derived.targetRoles,
+        roleFamilies: derived.roleFamilies,
+        primaryTechnologies: derived.primaryTechnologies,
+        supportingTechnologies: derived.supportingTechnologies,
+        seniority: derived.seniorityLevel,
+        experienceYears: derived.totalYearsExperience,
+      },
       generatedQueries: derived.queryExplanations.map((e) => e.query),
+      executedQueries: activeSubQueries,
       queryEvidence: derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence })),
       queryConfidence: derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence })),
     };
 
     const debug = {
+      candidateProfile: pipeline.candidateProfile,
       queriesGenerated: activeSubQueries,
       generatedQueries: derived.queryExplanations.map((e) => e.query),
+      executedQueries: activeSubQueries,
       queryEvidence: derived.queryExplanations.map((e) => ({ query: e.query, source: e.source, evidence: e.evidence })),
       queryConfidence: derived.queryExplanations.map((e) => ({ query: e.query, confidence: e.confidence })),
       queryExplanations: derived.queryExplanations,

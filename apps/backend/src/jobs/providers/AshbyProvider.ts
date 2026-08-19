@@ -8,6 +8,7 @@ import { BaseJobProvider, JobSearchQuery, PaginationOptions, PaginatedJobResults
 import { JobListing, JobPlatform, CountryCode } from '@sentinel/types';
 import { logger } from '@sentinel/shared';
 import { normalizePostingDate } from '../utils/dateNormalizer';
+import { jobVerificationService } from '../../services/JobVerificationService';
 
 const ASHBY_BOARDS = [
   'ramp', 'notion', 'linear', 'figma', 'vercel', 'supabase', 'retool', 'webflow',
@@ -156,25 +157,34 @@ export class AshbyProvider extends BaseJobProvider {
     });
   }
 
-  public normalize(raw: any, boardToken: string = 'ramp'): JobListing {
-    const title = raw.title || 'Software Engineer';
-    const company = raw.company || boardToken.charAt(0).toUpperCase() + boardToken.slice(1);
-    const location = raw.locationName || raw.location || 'Toronto, Canada';
+  public normalize(raw: any, boardToken: string = 'ramp'): JobListing | null {
+    if (!raw || typeof raw !== 'object') return null;
 
-    let country: CountryCode = 'CA';
-    const locLower = location.toLowerCase();
-    if (locLower.includes('australia') || locLower.includes('sydney')) {
-      country = 'AU';
-    } else if (locLower.includes('germany') || locLower.includes('berlin')) {
-      country = 'DE';
+    const rawId = raw.id;
+    const title = (raw.title || '').trim();
+    const company = (raw.company || (boardToken ? boardToken.charAt(0).toUpperCase() + boardToken.slice(1) : '')).trim();
+    const location = (raw.locationName || raw.location || '').trim();
+    const jobUrl = raw.jobUrl || (boardToken && rawId ? `https://jobs.ashbyhq.com/${boardToken}/${rawId}` : undefined);
+
+    // Reject job if essential provider fields are missing (Problem 5: ZERO FAKE JOB DATA)
+    if (!rawId || !title || !company || !location || !jobUrl) {
+      return null;
     }
+
+    const canonicalCountry = jobVerificationService.deriveCanonicalCountry(location, 'UNKNOWN');
+    const country = canonicalCountry.country as CountryCode;
 
     const desc = raw.descriptionHtml ? raw.descriptionHtml.replace(/<[^>]*>?/gm, '') : raw.description || '';
     const { isRemote, isHybrid } = this.detectWorkSetup(location, desc);
     const visaSponsorship = this.detectVisaSponsorship(desc);
 
+    // Extract genuine tech keywords from description if explicit requirements array is missing
+    const descLower = desc.toLowerCase();
+    const techCandidates = ['flutter', 'react native', 'react', 'node.js', 'typescript', 'javascript', 'python', 'swift', 'kotlin', 'java', 'go', 'graphql', 'sql', 'aws'];
+    const extractedReqs = techCandidates.filter((t) => descLower.includes(t)).map((t) => t.charAt(0).toUpperCase() + t.slice(1));
+
     return {
-      id: `ashby-${raw.id || Math.random().toString(36).substring(2, 9)}`,
+      id: `ashby-${rawId}`,
       platform: this.platform,
       company,
       title,
@@ -185,9 +195,9 @@ export class AshbyProvider extends BaseJobProvider {
       visaSponsorship,
       isRemote,
       isHybrid,
-      url: raw.jobUrl || `https://jobs.ashbyhq.com/${boardToken}/${raw.id || 'e21938'}`,
+      url: jobUrl,
       description: desc,
-      requirements: ['TypeScript', 'GraphQL', 'React'],
+      requirements: Array.isArray(raw.requirements) && raw.requirements.length > 0 ? raw.requirements : extractedReqs,
       postedDate: normalizePostingDate(raw.publishedAt) || '',
       postedAt: normalizePostingDate(raw.publishedAt),
       createdAt: new Date().toISOString(),

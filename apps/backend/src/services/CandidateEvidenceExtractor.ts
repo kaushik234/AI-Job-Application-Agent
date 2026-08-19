@@ -51,11 +51,11 @@ export class CandidateEvidenceExtractor {
     const urls = [master.linkedIn, master.github, master.portfolio].filter(Boolean) as string[];
 
     return {
-      candidateName: master.fullName || 'Kaushik Khandala',
+      candidateName: master.fullName || '',
       email: master.email || '',
       phone: master.phone || '',
       location: master.location || '',
-      experienceYears: master.explicitExperienceYears || 3.8,
+      experienceYears: master.explicitExperienceYears || 0,
       skills,
       companies,
       roles,

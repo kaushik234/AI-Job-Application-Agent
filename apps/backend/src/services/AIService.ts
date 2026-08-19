@@ -482,7 +482,7 @@ export class AIService {
       },
       candidate: {
         name: master.fullName,
-        experienceYears: master.explicitExperienceYears || 3.8,
+        experienceYears: master.explicitExperienceYears || 0,
         skills: evidenceObj.skills,
         companies: evidenceObj.companies,
         roles: evidenceObj.roles,
@@ -529,7 +529,7 @@ export class AIService {
         const { candidateEvidenceExtractor } = require('./CandidateEvidenceExtractor');
         const { formatCandidateExperienceYears } = require('../utils/experienceFormatter');
         const evidence = candidateEvidenceExtractor.extractCandidateEvidence(master);
-        const formattedExp = formatCandidateExperienceYears(master.explicitExperienceYears || 3.8);
+        const formattedExp = formatCandidateExperienceYears(master.explicitExperienceYears || 0);
 
         const coverLetter: Omit<CoverLetter, 'id' | 'pdfStoragePath' | 'generatedAt'> = {
           jobId: job.id,
@@ -554,7 +554,7 @@ export class AIService {
       const { candidateEvidenceExtractor } = require('./CandidateEvidenceExtractor');
       const { formatCandidateExperienceYears } = require('../utils/experienceFormatter');
       const evidence = candidateEvidenceExtractor.extractCandidateEvidence(master);
-      const formattedExp = formatCandidateExperienceYears(master.explicitExperienceYears || 3.8);
+      const formattedExp = formatCandidateExperienceYears(master.explicitExperienceYears || 0);
       const matchedSkills = evidence.skills.filter((s: string) =>
         (job.requirements || []).some((r: string) => r.toLowerCase().includes(s.toLowerCase())) ||
         (job.description || '').toLowerCase().includes(s.toLowerCase())

@@ -29,9 +29,10 @@ export interface DerivedJobQueries {
 
 /**
  * Calculates candidate experience years from resume work experience items.
+ * If no resume or experience is available, returns 0.
  */
 export function calculateResumeExperienceYears(resume?: MasterResume | null): number {
-  if (!resume) return 3.8;
+  if (!resume) return 0;
   if (resume.explicitExperienceYears && resume.explicitExperienceYears > 0) {
     return resume.explicitExperienceYears;
   }
@@ -47,7 +48,7 @@ export function calculateResumeExperienceYears(resume?: MasterResume | null): nu
   }
 
   if (!resume.experience || resume.experience.length === 0) {
-    return 3.8;
+    return 0;
   }
   let totalMonths = 0;
   for (const exp of resume.experience) {
@@ -62,7 +63,7 @@ export function calculateResumeExperienceYears(resume?: MasterResume | null): nu
       }
     }
   }
-  return Math.max(1, Number((totalMonths / 12).toFixed(1)));
+  return Math.max(0, Number((totalMonths / 12).toFixed(1)));
 }
 
 import { deriveCandidateTargetProfile } from './resumeMatcher';
@@ -87,7 +88,7 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     experienceYears: profile.experienceYears,
   }, null, 2));
 
-  // If no candidate resume or target skills exist and in WORLDWIDE mode
+  // If no candidate resume or target skills exist and no custom query
   if (!userQueryClean && profile.primaryRoles.length === 0 && profile.coreTechnologies.length === 0) {
     console.log('[SEARCH_QUERY_GENERATOR]', JSON.stringify({
       generatedQueries: [],
@@ -111,8 +112,9 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
   }
 
   const generatedQueriesSet = new Set<string>();
+  const queryEvidenceMap = new Map<string, { source: QueryGenerationExplanation['source']; evidence: string[]; confidence: number }>();
 
-  // Excluded non-engineering role terms to prevent non-engineering titles (like Operations Manager) from becoming target queries
+  // Excluded non-engineering role terms to prevent non-engineering titles from becoming target queries
   const nonEngineeringRoleTerms = [
     'account executive', 'account manager', 'sales manager', 'marketing manager',
     'recruiter', 'hr manager', 'finance manager', 'legal counsel', 'operations manager',
@@ -120,7 +122,7 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
     'social media manager', 'event marketing', 'gtm strategist'
   ];
 
-  // A. Role Title Permutations (only clean engineering role titles)
+  // A. Role Title Permutations derived directly from candidate experience roles
   for (const role of profile.primaryRoles) {
     const rClean = role.trim();
     if (!rClean) continue;
@@ -130,105 +132,229 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
       continue;
     }
 
+    // 1. Direct role title from experience
     generatedQueriesSet.add(rClean);
+    queryEvidenceMap.set(rClean, {
+      source: 'candidate_role_profile',
+      evidence: [`Candidate has professional experience title "${rClean}"`],
+      confidence: 0.98,
+    });
 
-    // Swap Developer <-> Engineer
+    // 2. Developer <-> Engineer variant
     if (rLower.includes('developer')) {
-      generatedQueriesSet.add(rClean.replace(/developer/i, 'Engineer'));
+      const variant = rClean.replace(/developer/i, 'Engineer');
+      generatedQueriesSet.add(variant);
+      queryEvidenceMap.set(variant, {
+        source: 'candidate_role_profile',
+        evidence: [`Engineering title variant derived from experience title "${rClean}"`],
+        confidence: 0.95,
+      });
     } else if (rLower.includes('engineer')) {
-      generatedQueriesSet.add(rClean.replace(/engineer/i, 'Developer'));
+      const variant = rClean.replace(/engineer/i, 'Developer');
+      generatedQueriesSet.add(variant);
+      queryEvidenceMap.set(variant, {
+        source: 'candidate_role_profile',
+        evidence: [`Developer title variant derived from experience title "${rClean}"`],
+        confidence: 0.95,
+      });
     }
 
-    // Add base role without Senior/Lead/Junior prefix
+    // 3. Base role title without Senior/Lead/Junior prefix
     const baseRole = rClean.replace(/^(senior|lead|junior|principal|staff|associate)\s+/i, '').trim();
     if (baseRole && baseRole !== rClean) {
       generatedQueriesSet.add(baseRole);
+      queryEvidenceMap.set(baseRole, {
+        source: 'candidate_role_profile',
+        evidence: [`Base role concept derived from experience title "${rClean}"`],
+        confidence: 0.94,
+      });
+
       if (baseRole.toLowerCase().includes('developer')) {
-        generatedQueriesSet.add(baseRole.replace(/developer/i, 'Engineer'));
+        const baseVariant = baseRole.replace(/developer/i, 'Engineer');
+        generatedQueriesSet.add(baseVariant);
+        queryEvidenceMap.set(baseVariant, {
+          source: 'candidate_role_profile',
+          evidence: [`Engineering base variant derived from experience title "${rClean}"`],
+          confidence: 0.92,
+        });
       } else if (baseRole.toLowerCase().includes('engineer')) {
-        generatedQueriesSet.add(baseRole.replace(/engineer/i, 'Developer'));
+        const baseVariant = baseRole.replace(/engineer/i, 'Developer');
+        generatedQueriesSet.add(baseVariant);
+        queryEvidenceMap.set(baseVariant, {
+          source: 'candidate_role_profile',
+          evidence: [`Developer base variant derived from experience title "${rClean}"`],
+          confidence: 0.92,
+        });
       }
     }
 
-    // Add Senior / Lead prefix if supported
+    // 4. Senior / Lead prefix if candidate seniority supports it
     if ((seniorityLevel === 'Senior' || seniorityLevel === 'Lead') && !rLower.startsWith('senior') && !rLower.startsWith('lead')) {
-      generatedQueriesSet.add(`Senior ${rClean}`);
-      if (baseRole) {
-        generatedQueriesSet.add(`Senior ${baseRole}`);
+      const srQuery = `Senior ${rClean}`;
+      generatedQueriesSet.add(srQuery);
+      queryEvidenceMap.set(srQuery, {
+        source: 'candidate_role_profile',
+        evidence: [`Seniority alignment (${seniorityLevel}, ${totalYearsExperience} yrs) applied to experience role "${rClean}"`],
+        confidence: 0.93,
+      });
+
+      if (baseRole && baseRole !== rClean) {
+        const srBaseQuery = `Senior ${baseRole}`;
+        generatedQueriesSet.add(srBaseQuery);
+        queryEvidenceMap.set(srBaseQuery, {
+          source: 'candidate_role_profile',
+          evidence: [`Seniority alignment (${seniorityLevel}, ${totalYearsExperience} yrs) applied to base role "${baseRole}"`],
+          confidence: 0.91,
+        });
       }
     }
   }
 
-  // B. Core Technology + Relevant Role Permutations
-  // Restrict strictly to primary frameworks & major languages.
-  // Supporting technologies (Git, SQLite, BLoC, Firebase, VS Code, SQL, Dart, etc.) MUST NOT become job titles!
-  const QUERY_ELIGIBLE_TECHS = new Set([
-    'flutter', 'react native', 'react', 'next.js', 'vue', 'angular', 'node', 'node.js', 'nodejs',
-    'python', 'django', 'fastapi', 'java', 'spring', 'golang', 'go', 'ruby', 'rails', 'c#', '.net', 'cpp', 'c++',
-    'spark', 'snowflake', 'kotlin', 'swift'
-  ]);
-
+  // B. Dynamic Primary Technology + Professional Role Permutations
+  // Supporting technologies (Git, SQLite, BLoC, Firebase, VS Code, SQL, Dart, etc.) MUST NEVER become job titles!
   for (const tech of profile.primaryTechnologies) {
     const tClean = tech.trim();
     if (tClean.length < 2) continue;
 
-    if (!QUERY_ELIGIBLE_TECHS.has(tClean.toLowerCase())) {
-      continue;
-    }
-
-    // Capitalize tech nicely
     let tCap = tClean.charAt(0).toUpperCase() + tClean.slice(1);
     if (tClean.toLowerCase() === 'node' || tClean.toLowerCase() === 'node.js' || tClean.toLowerCase() === 'nodejs') {
       tCap = 'Node.js';
     }
 
+    // Combine with candidate's primary engineering role concepts
     if (profile.roleFamilies.includes('cross_platform_mobile') || profile.roleFamilies.includes('mobile')) {
-      generatedQueriesSet.add(`${tCap} Developer`);
-      generatedQueriesSet.add(`${tCap} Engineer`);
-      generatedQueriesSet.add(`${tCap} Mobile Engineer`);
+      const qDev = `${tCap} Developer`;
+      const qEng = `${tCap} Engineer`;
+      generatedQueriesSet.add(qDev);
+      generatedQueriesSet.add(qEng);
+
+      queryEvidenceMap.set(qDev, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in mobile application development experience`],
+        confidence: 0.94,
+      });
+      queryEvidenceMap.set(qEng, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in mobile engineering experience`],
+        confidence: 0.94,
+      });
     } else if (profile.roleFamilies.includes('backend_systems') || profile.roleFamilies.includes('backend')) {
-      generatedQueriesSet.add(`${tCap} Developer`);
-      generatedQueriesSet.add(`${tCap} Engineer`);
-      generatedQueriesSet.add(`${tCap} Backend Engineer`);
+      const qDev = `${tCap} Developer`;
+      const qEng = `${tCap} Engineer`;
+      generatedQueriesSet.add(qDev);
+      generatedQueriesSet.add(qEng);
+
+      queryEvidenceMap.set(qDev, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in backend systems experience`],
+        confidence: 0.94,
+      });
+      queryEvidenceMap.set(qEng, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in backend engineering experience`],
+        confidence: 0.94,
+      });
     } else if (profile.roleFamilies.includes('web_frontend') || profile.roleFamilies.includes('frontend')) {
-      generatedQueriesSet.add(`${tCap} Developer`);
-      generatedQueriesSet.add(`${tCap} Engineer`);
-      generatedQueriesSet.add(`${tCap} Frontend Engineer`);
-    } else if (profile.roleFamilies.includes('data_engineering') || profile.roleFamilies.includes('data')) {
-      generatedQueriesSet.add(`${tCap} Engineer`);
-      generatedQueriesSet.add(`${tCap} Data Engineer`);
-    } else if (profile.roleFamilies.includes('devops') || profile.roleFamilies.includes('cloud')) {
-      generatedQueriesSet.add(`${tCap} Engineer`);
-      generatedQueriesSet.add(`${tCap} DevOps Engineer`);
+      const qDev = `${tCap} Developer`;
+      const qEng = `${tCap} Engineer`;
+      generatedQueriesSet.add(qDev);
+      generatedQueriesSet.add(qEng);
+
+      queryEvidenceMap.set(qDev, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in web frontend experience`],
+        confidence: 0.94,
+      });
+      queryEvidenceMap.set(qEng, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" used in web frontend engineering experience`],
+        confidence: 0.94,
+      });
     } else {
-      generatedQueriesSet.add(`${tCap} Developer`);
-      generatedQueriesSet.add(`${tCap} Engineer`);
+      const qDev = `${tCap} Developer`;
+      const qEng = `${tCap} Engineer`;
+      generatedQueriesSet.add(qDev);
+      generatedQueriesSet.add(qEng);
+
+      queryEvidenceMap.set(qDev, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" in candidate skill stack`],
+        confidence: 0.90,
+      });
+      queryEvidenceMap.set(qEng, {
+        source: 'primary_tech_stack',
+        evidence: [`Primary technology "${tCap}" in candidate skill stack`],
+        confidence: 0.90,
+      });
     }
   }
 
-  // C. Role Family Base Queries (only when supported by profile.roleFamilies)
+  // C. Inferred Domain Role Concepts (derived semantically from candidate profile evidence)
   for (const family of profile.roleFamilies) {
     if (family === 'cross_platform_mobile' || family === 'mobile') {
-      generatedQueriesSet.add('Mobile Developer');
-      generatedQueriesSet.add('Mobile Engineer');
-      generatedQueriesSet.add('Software Engineer - Mobile');
-      generatedQueriesSet.add('Cross Platform Mobile Developer');
+      const mobDev = 'Mobile Developer';
+      const mobEng = 'Mobile Engineer';
+      generatedQueriesSet.add(mobDev);
+      generatedQueriesSet.add(mobEng);
+
+      if (!queryEvidenceMap.has(mobDev)) {
+        queryEvidenceMap.set(mobDev, {
+          source: 'role_family',
+          evidence: [`Mobile software development domain concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
+      if (!queryEvidenceMap.has(mobEng)) {
+        queryEvidenceMap.set(mobEng, {
+          source: 'role_family',
+          evidence: [`Mobile engineering domain concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
     } else if (family === 'backend_systems' || family === 'backend') {
-      generatedQueriesSet.add('Backend Engineer');
-      generatedQueriesSet.add('Backend Developer');
-      generatedQueriesSet.add('Software Engineer - Backend');
+      const beEng = 'Backend Engineer';
+      const beDev = 'Backend Developer';
+      generatedQueriesSet.add(beEng);
+      generatedQueriesSet.add(beDev);
+
+      if (!queryEvidenceMap.has(beEng)) {
+        queryEvidenceMap.set(beEng, {
+          source: 'role_family',
+          evidence: [`Backend systems domain concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
+      if (!queryEvidenceMap.has(beDev)) {
+        queryEvidenceMap.set(beDev, {
+          source: 'role_family',
+          evidence: [`Backend development domain concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
     } else if (family === 'web_frontend' || family === 'frontend') {
-      generatedQueriesSet.add('Frontend Engineer');
-      generatedQueriesSet.add('Frontend Developer');
+      const feEng = 'Frontend Engineer';
+      const feDev = 'Frontend Developer';
+      generatedQueriesSet.add(feEng);
+      generatedQueriesSet.add(feDev);
+
+      if (!queryEvidenceMap.has(feEng)) {
+        queryEvidenceMap.set(feEng, {
+          source: 'role_family',
+          evidence: [`Frontend engineering domain concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
     } else if (family === 'fullstack') {
-      generatedQueriesSet.add('Full Stack Engineer');
-      generatedQueriesSet.add('Full Stack Developer');
-    } else if (family === 'data_engineering' || family === 'data') {
-      generatedQueriesSet.add('Data Engineer');
-      generatedQueriesSet.add('Data Platform Engineer');
-    } else if (family === 'devops' || family === 'cloud') {
-      generatedQueriesSet.add('DevOps Engineer');
-      generatedQueriesSet.add('Cloud Engineer');
+      const fsEng = 'Full Stack Engineer';
+      generatedQueriesSet.add(fsEng);
+
+      if (!queryEvidenceMap.has(fsEng)) {
+        queryEvidenceMap.set(fsEng, {
+          source: 'role_family',
+          evidence: [`Fullstack engineering concept derived from candidate profile [${profile.primaryRoles.join(', ')}]`],
+          confidence: 0.89,
+        });
+      }
     }
   }
 
@@ -262,36 +388,17 @@ export function deriveSearchQueriesFromResume(resume?: MasterResume | null, user
   }
 
   for (const q of generatedQueries) {
-    let source: QueryGenerationExplanation['source'] = 'role_family';
-    let confidence = 0.88;
-    const evidence: string[] = [];
-
-    const matchedRole = profile.primaryRoles.find((r) => q.toLowerCase().includes(r.toLowerCase()));
-    const matchedTech = profile.primaryTechnologies.find((t) => q.toLowerCase().includes(t.toLowerCase()));
-
-    if (matchedRole && matchedTech) {
-      source = 'candidate_role_profile';
-      confidence = 0.95;
-      evidence.push(`Technology "${matchedTech}" appears in primary skills`, `Candidate experience includes role "${matchedRole}"`);
-    } else if (matchedRole) {
-      source = 'candidate_role_profile';
-      confidence = 0.94;
-      evidence.push(`Candidate experience includes role "${matchedRole}"`);
-    } else if (matchedTech) {
-      source = 'primary_tech_stack';
-      confidence = 0.92;
-      evidence.push(`Technology "${matchedTech}" appears in primary skill stack`, `Inferred role family [${profile.roleFamilies[0] || 'engineering'}]`);
-    } else {
-      source = 'role_family';
-      confidence = 0.88;
-      evidence.push(`Role family taxonomy expansion for [${profile.roleFamilies.join(', ')}]`);
-    }
+    const meta = queryEvidenceMap.get(q) || {
+      source: 'role_family' as const,
+      evidence: [`Inferred from candidate role families [${profile.roleFamilies.join(', ')}]`],
+      confidence: 0.85,
+    };
 
     queryExplanations.push({
       query: q,
-      source,
-      evidence,
-      confidence,
+      source: meta.source,
+      evidence: meta.evidence,
+      confidence: meta.confidence,
     });
   }
 

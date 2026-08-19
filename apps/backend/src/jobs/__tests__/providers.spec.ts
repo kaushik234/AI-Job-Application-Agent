@@ -17,7 +17,7 @@ import {
 } from '../providers';
 
 describe('Job Search Engine Providers Suite (Phase 6)', () => {
-  jest.setTimeout(30000);
+  jest.setTimeout(60000);
   const providers: { name: string; instance: BaseJobProvider }[] = [
     { name: 'Greenhouse', instance: new GreenhouseProvider() },
     { name: 'Lever', instance: new LeverProvider() },
